@@ -28,6 +28,7 @@ CSV_OUTPUT=false
 LOCATION_RADIUS=""
 LOCATION_BOUNDING_BOX=""
 SHOW_DEVICE_STATS=false
+REVERSE_GEOCODE=false
 
 # Arrays to store results for JSON/CSV output
 declare -a SEARCH_RESULTS
@@ -63,6 +64,7 @@ Options:
   --within-radius <lat>,<lon>,<radius_km>  Filter by GPS radius (decimal or DMS)
   --bounding-box <min_lat>,<max_lat>,<min_lon>,<max_lon>  Filter by GPS bounding box
   --device-stats         Show device clustering statistics
+  --reverse-geocode      Convert GPS coordinates to place names
   -h, --help            Show this help message
 
 Examples:
@@ -401,6 +403,12 @@ search_image_metadata() {
             exiftool "$file" 2>/dev/null | sed 's/^/  /'
             if [ -n "$gps_lat" ] && [ -n "$gps_lon" ]; then
                 echo -e "${CYAN}  GPS: $gps_lat, $gps_lon${NC}"
+                if [ "$REVERSE_GEOCODE" = true ]; then
+                    local location_name=$(reverse_geocode "$gps_lat" "$gps_lon")
+                    if [ -n "$location_name" ]; then
+                        echo -e "${CYAN}  Location: $location_name${NC}"
+                    fi
+                fi
             fi
             echo
         fi
@@ -511,6 +519,12 @@ search_video_metadata() {
             ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null | python3 -m json.tool 2>/dev/null || ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null
             if [ -n "$gps_lat" ] && [ -n "$gps_lon" ]; then
                 echo -e "${CYAN}  GPS: $gps_lat, $gps_lon${NC}"
+                if [ "$REVERSE_GEOCODE" = true ]; then
+                    local location_name=$(reverse_geocode "$gps_lat" "$gps_lon")
+                    if [ -n "$location_name" ]; then
+                        echo -e "${CYAN}  Location: $location_name${NC}"
+                    fi
+                fi
             fi
             echo
         fi
@@ -897,6 +911,52 @@ get_most_common_device() {
     fi
 }
 
+# Function to reverse geocode GPS coordinates to place names
+reverse_geocode() {
+    local lat="$1"
+    local lon="$2"
+    
+    # Check if coordinates are valid
+    if [ -z "$lat" ] || [ -z "$lon" ]; then
+        echo ""
+        return
+    fi
+    
+    # Use Nominatim (OpenStreetMap) for free reverse geocoding
+    local url="https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lon&zoom=10&addressdetails=1"
+    
+    # Make request with proper user agent (required by Nominatim)
+    local response=$(curl -s -A "MediaMetadataTools/1.0" "$url" 2>/dev/null)
+    
+    if [ -n "$response" ]; then
+        # Extract display name (most readable format)
+        local display_name=$(echo "$response" | grep -o '"display_name":"[^"]*"' | cut -d'"' -f4)
+        
+        # Extract address components for more detailed info
+        local city=$(echo "$response" | grep -o '"city":"[^"]*"' | cut -d'"' -f4)
+        local state=$(echo "$response" | grep -o '"state":"[^"]*"' | cut -d'"' -f4)
+        local country=$(echo "$response" | grep -o '"country":"[^"]*"' | cut -d'"' -f4)
+        
+        # Build a readable location string
+        local location=""
+        if [ -n "$city" ] && [ -n "$state" ]; then
+            location="$city, $state"
+        elif [ -n "$city" ]; then
+            location="$city"
+        elif [ -n "$state" ]; then
+            location="$state"
+        elif [ -n "$country" ]; then
+            location="$country"
+        elif [ -n "$display_name" ]; then
+            location="$display_name"
+        fi
+        
+        echo "$location"
+    else
+        echo ""
+    fi
+}
+
 # Main script
 main() {
     # Initialize positional arguments
@@ -958,6 +1018,10 @@ main() {
                 ;;
             --device-stats)
                 SHOW_DEVICE_STATS=true
+                shift
+                ;;
+            --reverse-geocode)
+                REVERSE_GEOCODE=true
                 shift
                 ;;
             -h|--help)
