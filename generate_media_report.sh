@@ -112,11 +112,117 @@ generate_json_report() {
 EOF
 }
 
+# Function to escape CSV values
+escape_csv_value() {
+    local value="$1"
+    # Replace double quotes with two double quotes
+    value="${value//\"/\"\"}"
+    # If value contains comma, newline, or double quote, wrap in quotes
+    if [[ "$value" =~ [,\"\n\r] ]]; then
+        value="\"$value\""
+    fi
+    echo "$value"
+}
+
+# Function to extract metadata field
+extract_metadata_field() {
+    local metadata="$1"
+    local field="$2"
+    # Use awk with proper encoding handling
+    local value=$(echo "$metadata" | LC_ALL=C awk -F': ' -v field="$field" '$1 == field {print $2; exit}' 2>/dev/null)
+    echo "$value"
+}
+
 # Function to generate CSV report
 generate_csv_report() {
-    echo "file,type,format,size"
-    # This would need to be implemented to show individual files
-    echo "csv,format,not,implemented"
+    local dir="$1"
+    local files_data="$2"
+    
+    # CSV header
+    echo "file,type,format,size,size_mb,date,camera_make,camera_model,keywords,description"
+    
+    # Output file data
+    echo "$files_data"
+}
+
+# Function to process file for CSV output
+process_file_for_csv() {
+    local file="$1"
+    local file_type="$2"
+    local format="$3"
+    local size="$4"
+    local size_mb="$5"
+    
+    # Initialize CSV fields
+    local date=""
+    local camera_make=""
+    local camera_model=""
+    local keywords=""
+    local description=""
+    
+    # Extract metadata based on file type
+    if [ "$file_type" = "image" ]; then
+        local metadata=$(exiftool "$file" 2>/dev/null | LC_ALL=C cat)
+        
+        # Extract date (prefer Date/Time Original, fallback to File Modification Date)
+        date=$(extract_metadata_field "$metadata" "Date/Time Original")
+        if [ -z "$date" ]; then
+            date=$(extract_metadata_field "$metadata" "File Modification Date/Time")
+        fi
+        
+        # Extract camera info
+        camera_make=$(extract_metadata_field "$metadata" "Make")
+        camera_model=$(extract_metadata_field "$metadata" "Model")
+        
+        # Extract keywords and description
+        keywords=$(extract_metadata_field "$metadata" "Keywords")
+        description=$(extract_metadata_field "$metadata" "Image Description")
+        if [ -z "$description" ]; then
+            description=$(extract_metadata_field "$metadata" "Caption")
+        fi
+        
+    elif [ "$file_type" = "video" ]; then
+        # Try exiftool first for video metadata
+        local metadata=$(exiftool "$file" 2>/dev/null | LC_ALL=C cat)
+        
+        # Extract date
+        date=$(extract_metadata_field "$metadata" "Date/Time Original")
+        if [ -z "$date" ]; then
+            date=$(extract_metadata_field "$metadata" "File Modification Date/Time")
+        fi
+        
+        # Extract camera info
+        camera_make=$(extract_metadata_field "$metadata" "Make")
+        camera_model=$(extract_metadata_field "$metadata" "Model")
+        
+        # Extract keywords and description
+        keywords=$(extract_metadata_field "$metadata" "Keywords")
+        description=$(extract_metadata_field "$metadata" "Description")
+        if [ -z "$description" ]; then
+            description=$(extract_metadata_field "$metadata" "Comment")
+        fi
+        
+        # Also try ffprobe for additional metadata
+        local ffprobe_metadata=$(ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null)
+        if [ -n "$ffprobe_metadata" ]; then
+            # Extract creation time from ffprobe
+            local ffprobe_date=$(echo "$ffprobe_metadata" | jq -r '.format.tags.creation_time // empty' 2>/dev/null)
+            if [ -n "$ffprobe_date" ] && [ "$ffprobe_date" != "null" ]; then
+                date="$ffprobe_date"
+            fi
+        fi
+    fi
+    
+    # Escape CSV values
+    local escaped_file=$(escape_csv_value "$file")
+    local escaped_date=$(escape_csv_value "$date")
+    local escaped_camera_make=$(escape_csv_value "$camera_make")
+    local escaped_camera_model=$(escape_csv_value "$camera_model")
+    local escaped_keywords=$(escape_csv_value "$keywords")
+    local escaped_description=$(escape_csv_value "$description")
+    
+    # Output CSV line
+    echo "$escaped_file,$file_type,$format,$size,$size_mb,$escaped_date,$escaped_camera_make,$escaped_camera_model,$escaped_keywords,$escaped_description"
 }
 
 # Main script
@@ -420,8 +526,44 @@ main() {
         generate_json_report "$directory" "$count" "$images" "$videos" "$total_size"
         
     elif [ "$output_format" = "csv" ]; then
+        # Process files for CSV output
+        local csv_data=""
+        
+        while read -r file; do
+            ((count++))
+            
+            # Get file extension
+            local ext="${file##*.}"
+            ext=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
+            
+            # Get file size
+            local size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null)
+            local size_mb=$(echo "scale=2; $size/1024/1024" | bc 2>/dev/null || echo "0")
+            total_size=$((total_size + size))
+            
+            # Determine file type and process for CSV
+            local file_type="other"
+            local format="$ext"
+            
+            case "$ext" in
+                jpg|jpeg|png|gif|bmp|tiff|tif|webp|heic|heif)
+                    ((images++))
+                    file_type="image"
+                    ;;
+                mp4|avi|mov|mkv|wmv|flv|webm|m4v|3gp|mpg|mpeg)
+                    ((videos++))
+                    file_type="video"
+                    ;;
+            esac
+            
+            # Process file for CSV output
+            local csv_line=$(process_file_for_csv "$file" "$file_type" "$format" "$size" "$size_mb")
+            csv_data="$csv_data$csv_line"$'\n'
+            
+        done < <(eval "$find_cmd")
+        
         # Generate CSV report
-        generate_csv_report
+        generate_csv_report "$directory" "$csv_data"
     fi
 }
 
