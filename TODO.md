@@ -11,18 +11,18 @@
 - [x] Add metadata keywords and descriptions
 - [x] Perfect for spreadsheet analysis and data processing
 
-#### 📅 Date Range Filtering
-- [ ] **Add `-D, --date-from` option** - Filter by start date (YYYY-MM-DD)
-- [ ] **Add `-T, --date-to` option** - Filter by end date (YYYY-MM-DD)
-- [ ] Support both creation and modification dates
-- [ ] Handle various date formats (EXIF, file system, etc.)
-- [ ] Useful for analyzing specific time periods
+#### 📅 Date Range Filtering ✅ COMPLETED (Phase 2)
+- [x] **Add `-D, --date-from` option** - Filter by start date (YYYY-MM-DD)
+- [x] **Add `-T, --date-to` option** - Filter by end date (YYYY-MM-DD)
+- [x] Support both creation and modification dates
+- [x] Handle various date formats (EXIF, file system, etc.)
+- [x] Useful for analyzing specific time periods
 
-#### 📏 File Size Filtering
-- [ ] **Add `-s, --min-size` option** - Minimum file size in bytes/KB/MB/GB
-- [ ] **Add `-S, --max-size` option** - Maximum file size in bytes/KB/MB/GB
-- [ ] Support human-readable sizes (e.g., "1MB", "500KB")
-- [ ] Helpful for finding large files or cleaning up storage
+#### 📏 File Size Filtering ✅ COMPLETED (Phase 2)
+- [x] **Add `-s, --min-size` option** - Minimum file size in bytes/KB/MB/GB
+- [x] **Add `-S, --max-size` option** - Maximum file size in bytes/KB/MB/GB
+- [x] Support human-readable sizes (e.g., "1MB", "500KB")
+- [x] Helpful for finding large files or cleaning up storage
 
 #### 🎯 File Type Filtering
 - [ ] **Add `--images-only` option** - Focus analysis on images only
@@ -165,11 +165,12 @@
 3. **Date/size filtering** for generate_media_report.sh
 4. **Field-specific search** for search_metadata.sh
 
-### Phase 2 (Enhanced Functionality)
+### Phase 2 (Enhanced Functionality) ✅ PARTIALLY COMPLETED
 1. **Export results** for search_metadata.sh
 2. **File type filtering** for generate_media_report.sh
 3. **Search statistics** for search_metadata.sh
 4. **Enhanced statistics** for generate_media_report.sh
+5. **Date/size filtering** for generate_media_report.sh ✅
 
 ### Phase 3 (Advanced Features)
 1. **Location analysis** for both scripts

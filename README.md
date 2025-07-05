@@ -115,14 +115,14 @@ Generate comprehensive report with keyword analysis:
 ./generate_media_report.sh ~/Media -r
 ```
 
-Generate comprehensive report with keyword analysis:
-```bash
-./generate_media_report.sh ~/Media
-```
-
 Generate CSV report with comprehensive metadata:
 ```bash
 ./generate_media_report.sh ~/Media -f csv
+```
+
+Generate report with date and size filtering:
+```bash
+./generate_media_report.sh ~/Media -D 2023-01-01 -T 2023-12-31 -s 1MB -S 100MB
 ```
 
 ### Command Line Options
@@ -148,7 +148,10 @@ Generate CSV report with comprehensive metadata:
 | `-d` | `--details` | Show detailed metadata for each file |
 | `-j` | `--json` | Export detailed JSON report |
 | `-c` | `--csv` | Export CSV report |
-
+| `-D` | `--date-from` | Filter: only files on/after this date (YYYY-MM-DD) |
+| `-T` | `--date-to` | Filter: only files on/before this date (YYYY-MM-DD) |
+| `-s` | `--min-size` | Filter: only files at least this size (e.g. 1MB) |
+| `-S` | `--max-size` | Filter: only files at most this size (e.g. 100MB) |
 | `-h` | `--help` | Show help message |
 
 ## Supported File Types

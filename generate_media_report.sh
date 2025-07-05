@@ -21,6 +21,10 @@ RECURSIVE=false
 SHOW_DETAILS=false
 EXPORT_JSON=false
 EXPORT_CSV=false
+DATE_FROM=""
+DATE_TO=""
+MIN_SIZE=""
+MAX_SIZE=""
 
 # Global variables for main function
 
@@ -41,10 +45,14 @@ Options:
   -d, --details            Show detailed metadata for each file
   -j, --json               Export detailed JSON report
   -c, --csv                Export CSV report
+  -D, --date-from <date>   Filter: only files on/after this date (YYYY-MM-DD)
+  -T, --date-to <date>     Filter: only files on/before this date (YYYY-MM-DD)
+  -s, --min-size <size>    Filter: only files at least this size (e.g. 1MB)
+  -S, --max-size <size>    Filter: only files at most this size (e.g. 100MB)
   -h, --help               Show this help message
 
 Examples:
-  $0 /path/to/media
+  $0 /path/to/media -D 2023-01-01 -T 2023-12-31 -s 1MB -S 100MB
   $0 /path/to/media -r -f json
   $0 /path/to/media -j -c -r
 
@@ -225,6 +233,36 @@ process_file_for_csv() {
     echo "$escaped_file,$file_type,$format,$size,$size_mb,$escaped_date,$escaped_camera_make,$escaped_camera_model,$escaped_keywords,$escaped_description"
 }
 
+# Utility: Convert human-readable size (e.g. 1MB, 500KB) to bytes
+parse_size_to_bytes() {
+    local size_str="$1"
+    if [[ "$size_str" =~ ^[0-9]+$ ]]; then
+        echo "$size_str"
+        return
+    fi
+    local num=$(echo "$size_str" | grep -o -E '^[0-9]+')
+    local unit=$(echo "$size_str" | grep -o -E '[KMGTP]?B$' | tr '[:upper:]' '[:lower:]')
+    case "$unit" in
+        b)   echo "$num" ;;
+        kb)  echo $((num * 1024)) ;;
+        mb)  echo $((num * 1024 * 1024)) ;;
+        gb)  echo $((num * 1024 * 1024 * 1024)) ;;
+        tb)  echo $((num * 1024 * 1024 * 1024 * 1024)) ;;
+        pb)  echo $((num * 1024 * 1024 * 1024 * 1024 * 1024)) ;;
+        *)   echo "$num" ;;
+    esac
+}
+
+# Utility: Convert date string to timestamp for comparison
+parse_date_to_timestamp() {
+    local date_str="$1"
+    if [[ "$date_str" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+        date -j -f "%Y-%m-%d" "$date_str" "+%s" 2>/dev/null || date -d "$date_str" "+%s" 2>/dev/null
+    else
+        echo ""
+    fi
+}
+
 # Main script
 main() {
     # Default values
@@ -235,7 +273,11 @@ main() {
     local export_json=false
     local export_csv=false
     local directory=""
-    
+    local date_from=""
+    local date_to=""
+    local min_size=""
+    local max_size=""
+
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -263,17 +305,32 @@ main() {
                 export_csv=true
                 shift
                 ;;
+            -D|--date-from)
+                date_from="$2"
+                shift 2
+                ;;
+            -T|--date-to)
+                date_to="$2"
+                shift 2
+                ;;
+            -s|--min-size)
+                min_size="$2"
+                shift 2
+                ;;
+            -S|--max-size)
+                max_size="$2"
+                shift 2
+                ;;
             -h|--help)
                 print_usage
                 exit 0
                 ;;
-            -*)
+            -* )
                 echo -e "${RED}Error: Unknown option $1${NC}"
                 print_usage
                 exit 1
                 ;;
-            *)
-                # This is the directory argument, not an option
+            * )
                 if [ -z "$directory" ]; then
                     directory="$1"
                 fi
@@ -281,6 +338,19 @@ main() {
                 ;;
         esac
     done
+
+    # Export variables for use in the rest of the script
+    OUTPUT_FORMAT="$output_format"
+    VERBOSE="$verbose"
+    RECURSIVE="$recursive"
+    SHOW_DETAILS="$show_details"
+    EXPORT_JSON="$export_json"
+    EXPORT_CSV="$export_csv"
+    DATE_FROM="$date_from"
+    DATE_TO="$date_to"
+    MIN_SIZE="$min_size"
+    MAX_SIZE="$max_size"
+    DIRECTORY="$directory"
     
     # Check if we have the required arguments
     if [ -z "$directory" ]; then
@@ -314,8 +384,6 @@ main() {
     local all_cameras=""
     local all_formats=""
     
-
-    
     # Only show progress and text output for text format
     if [ "$output_format" = "text" ]; then
         echo "=== COMPREHENSIVE MEDIA REPORT ==="
@@ -336,11 +404,79 @@ main() {
             # Show progress bar
             if [ $((processed % 10)) -eq 0 ] || [ $processed -eq 1 ] || [ $processed -eq $total_files ]; then
                 local progress=$((processed * 50 / total_files))
-                # Ensure progress doesn't exceed 50
-                if [ $progress -gt 50 ]; then
-                    progress=50
-                fi
+                if [ $progress -gt 50 ]; then progress=50; fi
                 printf "\rProcessing: [%-50s] %d/%d files" "$(printf '#%.0s' $(seq 1 $progress))" "$processed" "$total_files"
+            fi
+            
+            # Get file size
+            local size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null)
+
+            # Min/max size filtering
+            local min_bytes=""
+            local max_bytes=""
+            if [ -n "$MIN_SIZE" ]; then
+                min_bytes=$(parse_size_to_bytes "$MIN_SIZE")
+                if [ "$size" -lt "$min_bytes" ]; then
+                    continue
+                fi
+            fi
+            if [ -n "$MAX_SIZE" ]; then
+                max_bytes=$(parse_size_to_bytes "$MAX_SIZE")
+                if [ "$size" -gt "$max_bytes" ]; then
+                    continue
+                fi
+            fi
+
+            # Date filtering
+            if [ -n "$DATE_FROM" ] || [ -n "$DATE_TO" ]; then
+                local file_date=""
+                local file_timestamp=""
+                
+                # Try to get date from metadata first, fallback to file modification date
+                local ext="${file##*.}"
+                ext=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
+                
+                case "$ext" in
+                    jpg|jpeg|png|gif|bmp|tiff|tif|webp|heic|heif)
+                        local metadata=$(exiftool "$file" 2>/dev/null)
+                        file_date=$(extract_metadata_field "$metadata" "Date/Time Original")
+                        if [ -z "$file_date" ]; then
+                            file_date=$(extract_metadata_field "$metadata" "File Modification Date/Time")
+                        fi
+                        ;;
+                    mp4|avi|mov|mkv|wmv|flv|webm|m4v|3gp|mpg|mpeg)
+                        local metadata=$(exiftool "$file" 2>/dev/null)
+                        file_date=$(extract_metadata_field "$metadata" "Date/Time Original")
+                        if [ -z "$file_date" ]; then
+                            file_date=$(extract_metadata_field "$metadata" "File Modification Date/Time")
+                        fi
+                        ;;
+                esac
+                
+                # If no metadata date, use file modification date
+                if [ -z "$file_date" ]; then
+                    file_date=$(stat -f "%Sm" -t "%Y:%m:%d %H:%M:%S" "$file" 2>/dev/null || stat -c "%y" "$file" 2>/dev/null)
+                fi
+                
+                # Convert file date to timestamp for comparison
+                if [ -n "$file_date" ]; then
+                    file_timestamp=$(date -j -f "%Y:%m:%d %H:%M:%S" "$file_date" "+%s" 2>/dev/null || date -d "$file_date" "+%s" 2>/dev/null)
+                fi
+                
+                # Apply date filters
+                if [ -n "$DATE_FROM" ] && [ -n "$file_timestamp" ]; then
+                    local from_timestamp=$(parse_date_to_timestamp "$DATE_FROM")
+                    if [ -n "$from_timestamp" ] && [ "$file_timestamp" -lt "$from_timestamp" ]; then
+                        continue
+                    fi
+                fi
+                
+                if [ -n "$DATE_TO" ] && [ -n "$file_timestamp" ]; then
+                    local to_timestamp=$(parse_date_to_timestamp "$DATE_TO")
+                    if [ -n "$to_timestamp" ] && [ "$file_timestamp" -gt "$to_timestamp" ]; then
+                        continue
+                    fi
+                fi
             fi
             
             # Process file
@@ -351,7 +487,6 @@ main() {
             ext=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
             
             # Get file size
-            local size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null)
             total_size=$((total_size + size))
             
             # Determine file type and extract metadata
