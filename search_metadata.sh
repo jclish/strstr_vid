@@ -10,6 +10,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Default values
@@ -18,6 +19,8 @@ CASE_SENSITIVE=false
 RECURSIVE=false
 SHOW_METADATA=false
 USE_REGEX=false
+SEARCH_FIELD=""
+SHOW_FIELD_LIST=false
 
 # Function to print usage
 print_usage() {
@@ -36,6 +39,8 @@ Options:
   -r, --recursive        Search recursively in subdirectories
   -m, --show-metadata    Show full metadata for matching files
   -R, --regex            Enable regex pattern matching (default: simple string search)
+  -f, --field <field>    Search specific metadata field (e.g. Make, Model, Date)
+  -l, --field-list       Show available metadata fields for files
   -h, --help            Show this help message
 
 Examples:
@@ -44,6 +49,9 @@ Examples:
   $0 "2023" /path/to/media -v -m
   $0 "iPhone.*202[34]" /path/to/photos -R
   $0 "Canon|Nikon" /path/to/photos -R -i
+  $0 "Canon" /path/to/photos -f Make
+  $0 "2023" /path/to/photos -f "Date/Time Original"
+  $0 "" /path/to/photos -l
 
 Supported file types:
   Images: jpg, jpeg, png, gif, bmp, tiff, tif, webp, heic, heif
@@ -152,6 +160,107 @@ search_video_metadata() {
     [ "$found" = true ]
 }
 
+# Function to search in specific metadata field
+search_field_metadata() {
+    local file="$1"
+    local search_string="$2"
+    local field="$3"
+    local found=false
+    
+    if [ "$VERBOSE" = true ]; then
+        echo -e "${BLUE}Searching field '$field' in: $file${NC}"
+    fi
+    
+    # Get file extension
+    local ext="${file##*.}"
+    ext=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
+    
+    case "$ext" in
+        jpg|jpeg|png|gif|bmp|tiff|tif|webp|heic|heif)
+            # Search in image metadata using exiftool
+            local metadata=$(exiftool "$file" 2>/dev/null)
+            local field_value=$(echo "$metadata" | grep -E "^[[:space:]]*$field[[:space:]]*:" | sed 's/^[[:space:]]*[^:]*:[[:space:]]*//' | head -1)
+            
+            if [ -n "$field_value" ]; then
+                local grep_options=""
+                if [ "$USE_REGEX" = true ]; then
+                    grep_options="-E"
+                fi
+                if [ "$CASE_SENSITIVE" = false ]; then
+                    grep_options="$grep_options -i"
+                fi
+                
+                if echo "$field_value" | grep $grep_options -q "$search_string"; then
+                    found=true
+                    echo -e "${GREEN}✓ Found '$search_string' in field '$field' of image: $file${NC}"
+                    echo -e "${CYAN}  Field value: $field_value${NC}"
+                    
+                    if [ "$SHOW_METADATA" = true ]; then
+                        echo -e "${YELLOW}Full metadata:${NC}"
+                        exiftool "$file" 2>/dev/null | sed 's/^/  /'
+                        echo
+                    fi
+                fi
+            fi
+            ;;
+        mp4|avi|mov|mkv|wmv|flv|webm|m4v|3gp|mpg|mpeg)
+            # Search in video metadata using exiftool first
+            local metadata=$(exiftool "$file" 2>/dev/null)
+            local field_value=$(echo "$metadata" | grep -E "^[[:space:]]*$field[[:space:]]*:" | sed 's/^[[:space:]]*[^:]*:[[:space:]]*//' | head -1)
+            
+            if [ -n "$field_value" ]; then
+                local grep_options=""
+                if [ "$USE_REGEX" = true ]; then
+                    grep_options="-E"
+                fi
+                if [ "$CASE_SENSITIVE" = false ]; then
+                    grep_options="$grep_options -i"
+                fi
+                
+                if echo "$field_value" | grep $grep_options -q "$search_string"; then
+                    found=true
+                    echo -e "${GREEN}✓ Found '$search_string' in field '$field' of video: $file${NC}"
+                    echo -e "${CYAN}  Field value: $field_value${NC}"
+                    
+                    if [ "$SHOW_METADATA" = true ]; then
+                        echo -e "${YELLOW}Full metadata:${NC}"
+                        exiftool "$file" 2>/dev/null | sed 's/^/  /'
+                        echo
+                    fi
+                fi
+            fi
+            ;;
+    esac
+    
+    [ "$found" = true ]
+}
+
+# Function to list available metadata fields for a file
+list_metadata_fields() {
+    local file="$1"
+    
+    echo -e "${BLUE}Available metadata fields for: $file${NC}"
+    
+    # Get file extension
+    local ext="${file##*.}"
+    ext=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
+    
+    case "$ext" in
+        jpg|jpeg|png|gif|bmp|tiff|tif|webp|heic|heif)
+            echo -e "${YELLOW}Image metadata fields:${NC}"
+            exiftool "$file" 2>/dev/null | grep -E "^[[:space:]]*[^:]+[[:space:]]*:" | sed 's/^[[:space:]]*\([^:]*\):.*/\1/' | sort | uniq
+            ;;
+        mp4|avi|mov|mkv|wmv|flv|webm|m4v|3gp|mpg|mpeg)
+            echo -e "${YELLOW}Video metadata fields:${NC}"
+            exiftool "$file" 2>/dev/null | grep -E "^[[:space:]]*[^:]+[[:space:]]*:" | sed 's/^[[:space:]]*\([^:]*\):.*/\1/' | sort | uniq
+            ;;
+        *)
+            echo -e "${YELLOW}Unsupported file type: $file${NC}"
+            ;;
+    esac
+    echo
+}
+
 # Function to process a single file
 process_file() {
     local file="$1"
@@ -162,24 +271,37 @@ process_file() {
     local ext="${file##*.}"
     ext=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
     
-    # Check if it's an image file
-    case "$ext" in
-        jpg|jpeg|png|gif|bmp|tiff|tif|webp|heic|heif)
-            if search_image_metadata "$file" "$search_string"; then
-                found=true
-            fi
-            ;;
-        mp4|avi|mov|mkv|wmv|flv|webm|m4v|3gp|mpg|mpeg)
-            if search_video_metadata "$file" "$search_string"; then
-                found=true
-            fi
-            ;;
-        *)
-            if [ "$VERBOSE" = true ]; then
-                echo -e "${YELLOW}Skipping unsupported file type: $file${NC}"
-            fi
-            ;;
-    esac
+    # Handle field listing mode
+    if [ "$SHOW_FIELD_LIST" = true ]; then
+        list_metadata_fields "$file"
+        return 0
+    fi
+    
+    # Handle field-specific search
+    if [ -n "$SEARCH_FIELD" ]; then
+        if search_field_metadata "$file" "$search_string" "$SEARCH_FIELD"; then
+            found=true
+        fi
+    else
+        # Regular search (existing logic)
+        case "$ext" in
+            jpg|jpeg|png|gif|bmp|tiff|tif|webp|heic|heif)
+                if search_image_metadata "$file" "$search_string"; then
+                    found=true
+                fi
+                ;;
+            mp4|avi|mov|mkv|wmv|flv|webm|m4v|3gp|mpg|mpeg)
+                if search_video_metadata "$file" "$search_string"; then
+                    found=true
+                fi
+                ;;
+            *)
+                if [ "$VERBOSE" = true ]; then
+                    echo -e "${YELLOW}Skipping unsupported file type: $file${NC}"
+                fi
+                ;;
+        esac
+    fi
     
     [ "$found" = true ]
 }
@@ -244,6 +366,15 @@ main() {
                 USE_REGEX=true
                 shift
                 ;;
+            -f|--field)
+                SEARCH_FIELD="$2"
+                shift
+                shift
+                ;;
+            -l|--field-list)
+                SHOW_FIELD_LIST=true
+                shift
+                ;;
             -h|--help)
                 print_usage
                 exit 0
@@ -269,8 +400,13 @@ main() {
     fi
 
     # Check if we have the required arguments
-    if [ -z "$search_string" ] || [ -z "$directory" ]; then
-        echo -e "${RED}Error: Missing required arguments${NC}"
+    if [ -z "$search_string" ] && [ "$SHOW_FIELD_LIST" = false ]; then
+        echo -e "${RED}Error: Missing required search string argument${NC}"
+        print_usage
+        exit 1
+    fi
+    if [ -z "$directory" ]; then
+        echo -e "${RED}Error: Missing required directory argument${NC}"
         print_usage
         exit 1
     fi

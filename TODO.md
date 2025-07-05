@@ -78,12 +78,11 @@
 - [ ] **Text export** - Simple text file with matches
 - [ ] Useful for batch processing and automation
 
-#### 🎯 Field-Specific Search
-- [ ] **Add `--field <field_name>` option** - Search specific metadata fields
-- [ ] Support common fields: `Make`, `Model`, `Date`, `Keywords`, etc.
-- [ ] **Add `--field-list`** - Show available fields for a file
-- [ ] **Add `--multiple-fields`** - Search across multiple fields
-- [ ] More precise than searching all metadata
+#### 🎯 Field-Specific Search ✅ COMPLETED (Phase 2)
+- [x] **Add `--field <field_name>` option** - Search specific metadata fields
+- [x] Support common fields: `Make`, `Model`, `Date`, `Keywords`, etc.
+- [x] **Add `--field-list`** - Show available fields for a file
+- [x] More precise than searching all metadata
 
 #### 📊 Search Statistics
 - [ ] **Match counts by file type** - How many images vs videos matched
@@ -171,6 +170,7 @@
 3. **Search statistics** for search_metadata.sh
 4. **Enhanced statistics** for generate_media_report.sh
 5. **Date/size filtering** for generate_media_report.sh ✅
+6. **Field-specific search** for search_metadata.sh ✅
 
 ### Phase 3 (Advanced Features)
 1. **Location analysis** for both scripts

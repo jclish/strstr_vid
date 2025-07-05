@@ -64,11 +64,33 @@ sudo yum install perl-Image-ExifTool ffmpeg
 ./search_metadata.sh "202(3|4)" ~/Media -R
 ```
 
+#### Field-Specific Search (NEW in v2.5)
+- Use `-f` or `--field <field>` to search only a specific metadata field (e.g. Make, Model, Date/Time Original).
+- Use `-l` or `--field-list` to list all available metadata fields for each file in the directory.
+- Example: Search for 'Canon' only in the Make field:
+```bash
+./search_metadata.sh "Canon" ~/Pictures -f Make
+```
+- Example: List all metadata fields for each file:
+```bash
+./search_metadata.sh "" ~/Pictures -l
+```
+
 #### Examples
 
 Search for "Canon" in photos directory:
 ```bash
 ./search_metadata.sh "Canon" ~/Pictures
+```
+
+Search for "Canon" in the Make field only:
+```bash
+./search_metadata.sh "Canon" ~/Pictures -f Make
+```
+
+List all metadata fields for each file:
+```bash
+./search_metadata.sh "" ~/Pictures -l
 ```
 
 Search for "iPhone" in videos recursively (case-insensitive):
@@ -136,6 +158,8 @@ Generate report with date and size filtering:
 | `-r` | `--recursive` | Search recursively in subdirectories |
 | `-m` | `--show-metadata` | Show full metadata for matching files |
 | `-R` | `--regex` | Enable regex pattern matching |
+| `-f` | `--field` | Search only a specific metadata field |
+| `-l` | `--field-list` | List all available metadata fields for each file |
 | `-h` | `--help` | Show help message |
 
 #### Media Report Generator
