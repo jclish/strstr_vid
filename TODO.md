@@ -52,11 +52,13 @@
 - [x] **Markdown report** - Documentation-friendly format
 - [ ] **PDF export** - Printable reports with formatting
 
-#### 🎨 Enhanced Text Output
-- [ ] **Progress indicators** - Better progress reporting
-- [ ] **Color-coded output** - Highlight important information
-- [ ] **Summary charts** - ASCII art charts for terminal
-- [ ] **Export options** - Save text reports to files
+#### 🎨 Enhanced Text Output ✅ COMPLETED (v3.1)
+- [x] **Progress indicators** - Multi-stage, color-coded progress bar with ETA
+- [x] **Color-coded output** - Semantic highlights for all key metrics and sections
+- [x] **Summary charts** - ASCII art bar charts for format and camera distributions
+- [x] **Export options** - Save text reports to files with `--save-report`
+
+_Phase 1 implemented: Enhanced user experience, professional look, and exportable reports._
 
 ---
 
