@@ -21,6 +21,9 @@ RECURSIVE=false
 SHOW_DETAILS=false
 EXPORT_JSON=false
 EXPORT_CSV=false
+EXPORT_HTML=false
+EXPORT_MARKDOWN=false
+EXPORT_XML=false
 DATE_FROM=""
 DATE_TO=""
 MIN_SIZE=""
@@ -42,12 +45,15 @@ Arguments:
   directory        The directory to analyze
 
 Options:
-  -f, --format <format>    Output format: text, json, csv (default: text)
+  -f, --format <format>    Output format: text, json, csv, html, markdown, xml (default: text)
   -v, --verbose            Show detailed processing information
   -r, --recursive          Analyze recursively in subdirectories
   -d, --details            Show detailed metadata for each file
   -j, --json               Export detailed JSON report
   -c, --csv                Export CSV report
+  --html                   Export HTML report
+  --markdown               Export Markdown report
+  --xml                    Export XML report
   -D, --date-from <date>   Filter: only files on/after this date (YYYY-MM-DD)
   -T, --date-to <date>     Filter: only files on/before this date (YYYY-MM-DD)
   -s, --min-size <size>    Filter: only files at least this size (e.g. 1MB)
@@ -63,6 +69,9 @@ Examples:
   $0 /path/to/media -D 2023-01-01 -T 2023-12-31 -s 1MB -S 100MB
   $0 /path/to/media -r -f json
   $0 /path/to/media -j -c -r
+  $0 /path/to/media --html --markdown
+  $0 /path/to/media -f html
+  $0 /path/to/media --xml --verbose
 
 Supported file types:
   Images: jpg, jpeg, png, gif, bmp, tiff, tif, webp, heic, heif
@@ -239,6 +248,320 @@ process_file_for_csv() {
     
     # Output CSV line
     echo "$escaped_file,$file_type,$format,$size,$size_mb,$escaped_date,$escaped_camera_make,$escaped_camera_model,$escaped_keywords,$escaped_description"
+}
+
+# Function to generate HTML report
+generate_html_report() {
+    local dir="$1"
+    local count="$2"
+    local images="$3"
+    local videos="$4"
+    local total_size="$5"
+    local all_keywords="$6"
+    local all_cameras="$7"
+    local all_formats="$8"
+    
+    cat << EOF
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Report - $(basename "$dir")</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+        h2 { color: #34495e; margin-top: 30px; }
+        .summary { background: #ecf0f1; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .stat-card { background: #3498db; color: white; padding: 15px; border-radius: 5px; text-align: center; }
+        .stat-number { font-size: 2em; font-weight: bold; }
+        .stat-label { font-size: 0.9em; opacity: 0.9; }
+        .format-list { background: #f8f9fa; padding: 15px; border-radius: 5px; }
+        .keyword-cloud { background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .keyword { display: inline-block; margin: 2px; padding: 4px 8px; background: #007bff; color: white; border-radius: 3px; font-size: 0.8em; }
+        .generated { color: #6c757d; font-size: 0.9em; text-align: center; margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Media Report</h1>
+        <div class="generated">Generated on $(date) for directory: $dir</div>
+        
+        <div class="summary">
+            <h2>📋 Summary</h2>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-number">$count</div>
+                    <div class="stat-label">Total Files</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">$images</div>
+                    <div class="stat-label">Images</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">$videos</div>
+                    <div class="stat-label">Videos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">$(echo "scale=1; $total_size/1024/1024" | bc) MB</div>
+                    <div class="stat-label">Total Size</div>
+                </div>
+            </div>
+        </div>
+        
+        <h2>📷 Image Analysis</h2>
+        <div class="format-list">
+            <p><strong>Image count:</strong> $images</p>
+            <p><strong>Formats found:</strong></p>
+            <ul>
+EOF
+    
+    # Add format breakdown
+    if [ -n "$all_formats" ]; then
+        echo "$all_formats" | tr ' ' '\n' | grep -E "(jpg|jpeg|png|gif|bmp|tiff|tif|webp|heic|heif)" | sort | uniq -c | sort -nr | while read count format; do
+            echo "                <li>$format: $count files</li>"
+        done
+    fi
+    
+    cat << EOF
+            </ul>
+        </div>
+        
+        <h2>🎬 Video Analysis</h2>
+        <div class="format-list">
+            <p><strong>Video count:</strong> $videos</p>
+            <p><strong>Formats found:</strong></p>
+            <ul>
+EOF
+    
+    # Add video format breakdown
+    if [ -n "$all_formats" ]; then
+        echo "$all_formats" | tr ' ' '\n' | grep -E "(mp4|avi|mov|mkv|wmv|flv|webm|m4v|3gp|mpg|mpeg)" | sort | uniq -c | sort -nr | while read count format; do
+            echo "                <li>$format: $count files</li>"
+        done
+    fi
+    
+    cat << EOF
+            </ul>
+        </div>
+        
+        <h2>🔍 Keyword Analysis</h2>
+        <div class="keyword-cloud">
+EOF
+    
+    # Add keyword cloud
+    if [ -n "$all_keywords" ]; then
+        echo "$all_keywords" | \
+            sed 's/Keywords: //g' | \
+            sed 's/Subject: //g' | \
+            sed 's/Description: //g' | \
+            sed 's/Title: //g' | \
+            sed 's/Caption: //g' | \
+            sed 's/Comment: //g' | \
+            tr '[:upper:]' '[:lower:]' | \
+            tr ' ' '\n' | \
+            grep -v "^$" | \
+            grep -E "[a-z]{4,}" | \
+            grep -v -E "(make|model|date|time|original|create|modify|camera|image|video|format|file|size|bytes|adobe|stock|adobestock|handler|encoder|creation|duration|bitrate|minor|major|compatible|brands|isom|avc1|mp42)" | \
+            sort | uniq -c | sort -nr | head -20 | while read count word; do
+                echo "            <span class=\"keyword\">$word ($count)</span>"
+            done
+    fi
+    
+    cat << EOF
+        </div>
+        
+        <div class="generated">
+            Report generated by generate_media_report.sh v2.9
+        </div>
+    </div>
+</body>
+</html>
+EOF
+}
+
+# Function to generate Markdown report
+generate_markdown_report() {
+    local dir="$1"
+    local count="$2"
+    local images="$3"
+    local videos="$4"
+    local total_size="$5"
+    local all_keywords="$6"
+    local all_cameras="$7"
+    local all_formats="$8"
+    
+    cat << EOF
+# 📊 Media Report
+
+**Generated:** $(date)  
+**Directory:** $dir
+
+## 📋 Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Files | $count |
+| Images | $images |
+| Videos | $videos |
+| Other | $((count - images - videos)) |
+| Total Size | $(echo "scale=1; $total_size/1024/1024" | bc) MB |
+
+## 📷 Image Analysis
+
+**Image count:** $images
+
+### Formats Found
+EOF
+    
+    # Add format breakdown
+    if [ -n "$all_formats" ]; then
+        echo "$all_formats" | tr ' ' '\n' | grep -E "(jpg|jpeg|png|gif|bmp|tiff|tif|webp|heic|heif)" | sort | uniq -c | sort -nr | while read count format; do
+            echo "- $format: $count files"
+        done
+    fi
+    
+    cat << EOF
+
+## 🎬 Video Analysis
+
+**Video count:** $videos
+
+### Formats Found
+EOF
+    
+    # Add video format breakdown
+    if [ -n "$all_formats" ]; then
+        echo "$all_formats" | tr ' ' '\n' | grep -E "(mp4|avi|mov|mkv|wmv|flv|webm|m4v|3gp|mpg|mpeg)" | sort | uniq -c | sort -nr | while read count format; do
+            echo "- $format: $count files"
+        done
+    fi
+    
+    cat << EOF
+
+## 🔍 Keyword Analysis
+
+### Top Keywords
+EOF
+    
+    # Add keyword analysis
+    if [ -n "$all_keywords" ]; then
+        echo "$all_keywords" | \
+            sed 's/Keywords: //g' | \
+            sed 's/Subject: //g' | \
+            sed 's/Description: //g' | \
+            sed 's/Title: //g' | \
+            sed 's/Caption: //g' | \
+            sed 's/Comment: //g' | \
+            tr '[:upper:]' '[:lower:]' | \
+            tr ' ' '\n' | \
+            grep -v "^$" | \
+            grep -E "[a-z]{4,}" | \
+            grep -v -E "(make|model|date|time|original|create|modify|camera|image|video|format|file|size|bytes|adobe|stock|adobestock|handler|encoder|creation|duration|bitrate|minor|major|compatible|brands|isom|avc1|mp42)" | \
+            sort | uniq -c | sort -nr | head -15 | while read count word; do
+                echo "- **$word**: $count occurrences"
+            done
+    fi
+    
+    cat << EOF
+
+---
+*Report generated by generate_media_report.sh v2.9*
+EOF
+}
+
+# Function to generate XML report
+generate_xml_report() {
+    local dir="$1"
+    local count="$2"
+    local images="$3"
+    local videos="$4"
+    local total_size="$5"
+    local all_keywords="$6"
+    local all_cameras="$7"
+    local all_formats="$8"
+    
+    cat << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<mediaReport>
+    <metadata>
+        <generated>$(date -u +"%Y-%m-%dT%H:%M:%SZ")</generated>
+        <directory>$dir</directory>
+        <script>generate_media_report.sh</script>
+        <version>2.9</version>
+    </metadata>
+    
+    <summary>
+        <totalFiles>$count</totalFiles>
+        <images>$images</images>
+        <videos>$videos</videos>
+        <other>$((count - images - videos))</other>
+        <totalSize>$total_size</totalSize>
+        <totalSizeMB>$(echo "scale=1; $total_size/1024/1024" | bc)</totalSizeMB>
+    </summary>
+    
+    <imageAnalysis>
+        <count>$images</count>
+        <formats>
+EOF
+    
+    # Add image format breakdown
+    if [ -n "$all_formats" ]; then
+        echo "$all_formats" | tr ' ' '\n' | grep -E "(jpg|jpeg|png|gif|bmp|tiff|tif|webp|heic|heif)" | sort | uniq -c | sort -nr | while read count format; do
+            echo "            <format name=\"$format\" count=\"$count\"/>"
+        done
+    fi
+    
+    cat << EOF
+        </formats>
+    </imageAnalysis>
+    
+    <videoAnalysis>
+        <count>$videos</count>
+        <formats>
+EOF
+    
+    # Add video format breakdown
+    if [ -n "$all_formats" ]; then
+        echo "$all_formats" | tr ' ' '\n' | grep -E "(mp4|avi|mov|mkv|wmv|flv|webm|m4v|3gp|mpg|mpeg)" | sort | uniq -c | sort -nr | while read count format; do
+            echo "            <format name=\"$format\" count=\"$count\"/>"
+        done
+    fi
+    
+    cat << EOF
+        </formats>
+    </videoAnalysis>
+    
+    <keywordAnalysis>
+        <keywords>
+EOF
+    
+    # Add keyword analysis
+    if [ -n "$all_keywords" ]; then
+        echo "$all_keywords" | \
+            sed 's/Keywords: //g' | \
+            sed 's/Subject: //g' | \
+            sed 's/Description: //g' | \
+            sed 's/Title: //g' | \
+            sed 's/Caption: //g' | \
+            sed 's/Comment: //g' | \
+            tr '[:upper:]' '[:lower:]' | \
+            tr ' ' '\n' | \
+            grep -v "^$" | \
+            grep -E "[a-z]{4,}" | \
+            grep -v -E "(make|model|date|time|original|create|modify|camera|image|video|format|file|size|bytes|adobe|stock|adobestock|handler|encoder|creation|duration|bitrate|minor|major|compatible|brands|isom|avc1|mp42)" | \
+            sort | uniq -c | sort -nr | head -20 | while read count word; do
+                echo "            <keyword name=\"$word\" count=\"$count\"/>"
+            done
+    fi
+    
+    cat << EOF
+        </keywords>
+    </keywordAnalysis>
+</mediaReport>
+EOF
 }
 
 # Utility: Convert human-readable size (e.g. 1MB, 500KB) to bytes
@@ -1164,6 +1487,9 @@ main() {
     local show_details=false
     local export_json=false
     local export_csv=false
+    local export_html=false
+    local export_markdown=false
+    local export_xml=false
     local directory=""
     local date_from=""
     local date_to=""
@@ -1198,6 +1524,18 @@ main() {
                 ;;
             -c|--csv)
                 export_csv=true
+                shift
+                ;;
+            --html)
+                export_html=true
+                shift
+                ;;
+            --markdown)
+                export_markdown=true
+                shift
+                ;;
+            --xml)
+                export_xml=true
                 shift
                 ;;
             -D|--date-from)
@@ -1253,6 +1591,9 @@ main() {
     SHOW_DETAILS="$show_details"
     EXPORT_JSON="$export_json"
     EXPORT_CSV="$export_csv"
+    EXPORT_HTML="$export_html"
+    EXPORT_MARKDOWN="$export_markdown"
+    EXPORT_XML="$export_xml"
     DATE_FROM="$date_from"
     DATE_TO="$date_to"
     MIN_SIZE="$min_size"
@@ -1304,8 +1645,14 @@ main() {
     local file_hashes=""
     local format_sizes=""
     
+    # Check if we should generate text output (default or explicitly requested)
+    local generate_text=false
+    if [ "$output_format" = "text" ] || [ "$output_format" = "" ]; then
+        generate_text=true
+    fi
+    
     # Only show progress and text output for text format
-    if [ "$output_format" = "text" ]; then
+    if [ "$generate_text" = true ]; then
         echo "=== COMPREHENSIVE MEDIA REPORT ==="
         echo "Directory: $directory"
         echo "Generated: $(date)"
@@ -1629,7 +1976,115 @@ main() {
         echo ""
         echo "✅ REPORT COMPLETE"
         
-    elif [ "$output_format" = "json" ]; then
+    fi
+    
+    # Handle multiple format exports
+    if [ "$EXPORT_JSON" = true ] || [ "$EXPORT_CSV" = true ] || [ "$EXPORT_HTML" = true ] || [ "$EXPORT_MARKDOWN" = true ] || [ "$EXPORT_XML" = true ]; then
+        # Reset counters for multiple format processing
+        count=0
+        images=0
+        videos=0
+        total_size=0
+        all_keywords=""
+        all_cameras=""
+        all_formats=""
+        
+        # Process files for multiple formats
+        while read -r file; do
+            ((count++))
+            
+            # Get file extension
+            local ext="${file##*.}"
+            ext=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
+            
+            # Get file size
+            local size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null)
+            total_size=$((total_size + size))
+            
+            # Determine file type
+            case "$ext" in
+                jpg|jpeg|png|gif|bmp|tiff|tif|webp|heic|heif)
+                    ((images++))
+                    all_formats="$all_formats $ext"
+                    ;;
+                mp4|avi|mov|mkv|wmv|flv|webm|m4v|3gp|mpg|mpeg)
+                    ((videos++))
+                    all_formats="$all_formats $ext"
+                    ;;
+            esac
+            
+            # Extract keywords for reports
+            case "$ext" in
+                jpg|jpeg|png|gif|bmp|tiff|tif|webp|heic|heif)
+                    local metadata=$(exiftool "$file" 2>/dev/null)
+                    local keywords=$(echo "$metadata" | grep -E "(Keywords|Subject|Description|Caption|Title)" | grep -v -E "(Make|Model|Date|Time|Format|File|Size|Bytes|Camera|Image)" | head -3)
+                    if [ -n "$keywords" ]; then
+                        all_keywords="$all_keywords $keywords"
+                    fi
+                    ;;
+                mp4|avi|mov|mkv|wmv|flv|webm|m4v|3gp|mpg|mpeg)
+                    local metadata=$(exiftool "$file" 2>/dev/null)
+                    local keywords=$(echo "$metadata" | grep -E "(Keywords|Subject|Description|Caption|Title|Comment)" | grep -v -E "(Make|Model|Date|Time|Format|File|Size|Bytes|Camera|Video|Codec|Duration)" | head -3)
+                    if [ -n "$keywords" ]; then
+                        all_keywords="$all_keywords $keywords"
+                    fi
+                    ;;
+            esac
+        done < <(eval "$find_cmd")
+        
+        # Generate requested formats
+        if [ "$EXPORT_JSON" = true ]; then
+            generate_json_report "$directory" "$count" "$images" "$videos" "$total_size"
+        fi
+        
+        if [ "$EXPORT_CSV" = true ]; then
+            # Process files for CSV output
+            local csv_data=""
+            while read -r file; do
+                # Get file extension
+                local ext="${file##*.}"
+                ext=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
+                
+                # Get file size
+                local size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null)
+                local size_mb=$(echo "scale=2; $size/1024/1024" | bc 2>/dev/null || echo "0")
+                
+                # Determine file type and process for CSV
+                local file_type="other"
+                local format="$ext"
+                
+                case "$ext" in
+                    jpg|jpeg|png|gif|bmp|tiff|tif|webp|heic|heif)
+                        file_type="image"
+                        ;;
+                    mp4|avi|mov|mkv|wmv|flv|webm|m4v|3gp|mpg|mpeg)
+                        file_type="video"
+                        ;;
+                esac
+                
+                # Process file for CSV output
+                local csv_line=$(process_file_for_csv "$file" "$file_type" "$format" "$size" "$size_mb")
+                csv_data="$csv_data$csv_line"$'\n'
+            done < <(eval "$find_cmd")
+            
+            generate_csv_report "$directory" "$csv_data"
+        fi
+        
+        if [ "$EXPORT_HTML" = true ]; then
+            generate_html_report "$directory" "$count" "$images" "$videos" "$total_size" "$all_keywords" "$all_cameras" "$all_formats"
+        fi
+        
+        if [ "$EXPORT_MARKDOWN" = true ]; then
+            generate_markdown_report "$directory" "$count" "$images" "$videos" "$total_size" "$all_keywords" "$all_cameras" "$all_formats"
+        fi
+        
+        if [ "$EXPORT_XML" = true ]; then
+            generate_xml_report "$directory" "$count" "$images" "$videos" "$total_size" "$all_keywords" "$all_cameras" "$all_formats"
+        fi
+    fi
+    
+    # Handle single format output
+    if [ "$output_format" = "json" ]; then
         # Process files silently for JSON output
         while read -r file; do
             ((count++))

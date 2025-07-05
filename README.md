@@ -12,7 +12,7 @@ A comprehensive suite of shell scripts for analyzing and searching metadata in v
 
 ### 2. Media Report Generator (`generate_media_report.sh`)
 - **Comprehensive analysis**: Generates detailed reports about media collections
-- **Multiple output formats**: Text, JSON, and CSV reports
+- **Multiple output formats**: Text, JSON, CSV, HTML, Markdown, and XML reports
 - **Enhanced statistics**: Advanced analytics including:
   - Average file sizes by format
   - Storage usage trends with size distributions
@@ -154,6 +154,26 @@ Generate CSV report with comprehensive metadata:
 ./generate_media_report.sh ~/Media -f csv
 ```
 
+Generate HTML report for web viewing:
+```bash
+./generate_media_report.sh ~/Media --html
+```
+
+Generate Markdown report for documentation:
+```bash
+./generate_media_report.sh ~/Media --markdown
+```
+
+Generate XML report for enterprise systems:
+```bash
+./generate_media_report.sh ~/Media --xml
+```
+
+Generate multiple format reports simultaneously:
+```bash
+./generate_media_report.sh ~/Media --html --markdown --xml
+```
+
 Generate report with date and size filtering:
 ```bash
 ./generate_media_report.sh ~/Media -D 2023-01-01 -T 2023-12-31 -s 1MB -S 100MB
@@ -184,12 +204,15 @@ Generate report with file type filtering:
 
 | Option | Long Option | Description |
 |--------|-------------|-------------|
-| `-f` | `--format` | Output format: text, json, csv (default: text) |
+| `-f` | `--format` | Output format: text, json, csv, html, markdown, xml (default: text) |
 | `-v` | `--verbose` | Show detailed processing information |
 | `-r` | `--recursive` | Analyze recursively in subdirectories |
 | `-d` | `--details` | Show detailed metadata for each file |
 | `-j` | `--json` | Export detailed JSON report |
 | `-c` | `--csv` | Export CSV report |
+| `--html` | | Export HTML report |
+| `--markdown` | | Export Markdown report |
+| `--xml` | | Export XML report |
 | `-D` | `--date-from` | Filter: only files on/after this date (YYYY-MM-DD) |
 | `-T` | `--date-to` | Filter: only files on/before this date (YYYY-MM-DD) |
 | `-s` | `--min-size` | Filter: only files at least this size (e.g. 1MB) |
