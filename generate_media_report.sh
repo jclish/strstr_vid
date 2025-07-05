@@ -128,8 +128,8 @@ escape_csv_value() {
 extract_metadata_field() {
     local metadata="$1"
     local field="$2"
-    # Use awk with proper encoding handling
-    local value=$(echo "$metadata" | LC_ALL=C awk -F': ' -v field="$field" '$1 == field {print $2; exit}' 2>/dev/null)
+    # Use grep and sed for more flexible field matching
+    local value=$(echo "$metadata" | LC_ALL=C grep -E "^[[:space:]]*$field[[:space:]]*:" | sed 's/^[[:space:]]*[^:]*:[[:space:]]*//' | head -1)
     echo "$value"
 }
 
