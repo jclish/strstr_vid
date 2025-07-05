@@ -24,11 +24,11 @@
 - [x] Support human-readable sizes (e.g., "1MB", "500KB")
 - [x] Helpful for finding large files or cleaning up storage
 
-#### 🎯 File Type Filtering
-- [ ] **Add `--images-only` option** - Focus analysis on images only
-- [ ] **Add `--videos-only` option** - Focus analysis on videos only
-- [ ] **Add `--format <format>` option** - Filter by specific format (jpg, mp4, etc.)
-- [ ] Useful for targeted analysis and storage planning
+#### 🎯 File Type Filtering ✅ COMPLETED (Phase 2)
+- [x] **Add `--images-only` option** - Focus analysis on images only
+- [x] **Add `--videos-only` option** - Focus analysis on videos only
+- [x] **Add `--format <format>` option** - Filter by specific format (jpg, mp4, etc.)
+- [x] Useful for targeted analysis and storage planning
 
 ### Medium Priority (Nice to have)
 
@@ -164,9 +164,9 @@
 3. **Date/size filtering** for generate_media_report.sh
 4. **Field-specific search** for search_metadata.sh
 
-### Phase 2 (Enhanced Functionality) ✅ PARTIALLY COMPLETED
+### Phase 2 (Enhanced Functionality) ✅ COMPLETED
 1. **Export results** for search_metadata.sh
-2. **File type filtering** for generate_media_report.sh
+2. **File type filtering** for generate_media_report.sh ✅
 3. **Search statistics** for search_metadata.sh
 4. **Enhanced statistics** for generate_media_report.sh
 5. **Date/size filtering** for generate_media_report.sh ✅

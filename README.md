@@ -147,6 +147,12 @@ Generate report with date and size filtering:
 ./generate_media_report.sh ~/Media -D 2023-01-01 -T 2023-12-31 -s 1MB -S 100MB
 ```
 
+Generate report with file type filtering:
+```bash
+./generate_media_report.sh ~/Media --images-only
+./generate_media_report.sh ~/Media --videos-only --format mov
+```
+
 ### Command Line Options
 
 #### Metadata Search Tool
@@ -176,6 +182,9 @@ Generate report with date and size filtering:
 | `-T` | `--date-to` | Filter: only files on/before this date (YYYY-MM-DD) |
 | `-s` | `--min-size` | Filter: only files at least this size (e.g. 1MB) |
 | `-S` | `--max-size` | Filter: only files at most this size (e.g. 100MB) |
+| `--images-only` | | Filter: only include image files |
+| `--videos-only` | | Filter: only include video files |
+| `--format <format>` | | Filter: only include files of this format (e.g. jpg, mp4) |
 | `-h` | `--help` | Show help message |
 
 ## Supported File Types

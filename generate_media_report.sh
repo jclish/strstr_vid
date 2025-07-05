@@ -25,6 +25,9 @@ DATE_FROM=""
 DATE_TO=""
 MIN_SIZE=""
 MAX_SIZE=""
+IMAGES_ONLY=false
+VIDEOS_ONLY=false
+FILTER_FORMAT=""
 
 # Global variables for main function
 
@@ -49,9 +52,14 @@ Options:
   -T, --date-to <date>     Filter: only files on/before this date (YYYY-MM-DD)
   -s, --min-size <size>    Filter: only files at least this size (e.g. 1MB)
   -S, --max-size <size>    Filter: only files at most this size (e.g. 100MB)
+  --images-only            Filter: only include image files
+  --videos-only            Filter: only include video files
+  --format <format>        Filter: only include files of this format (e.g. jpg, mp4)
   -h, --help               Show this help message
 
 Examples:
+  $0 /path/to/media --images-only
+  $0 /path/to/media --videos-only --format mov
   $0 /path/to/media -D 2023-01-01 -T 2023-12-31 -s 1MB -S 100MB
   $0 /path/to/media -r -f json
   $0 /path/to/media -j -c -r
@@ -277,6 +285,9 @@ main() {
     local date_to=""
     local min_size=""
     local max_size=""
+    local images_only=false
+    local videos_only=false
+    local filter_format=""
 
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
@@ -321,6 +332,18 @@ main() {
                 max_size="$2"
                 shift 2
                 ;;
+            --images-only)
+                images_only=true
+                shift
+                ;;
+            --videos-only)
+                videos_only=true
+                shift
+                ;;
+            --format)
+                filter_format="$2"
+                shift 2
+                ;;
             -h|--help)
                 print_usage
                 exit 0
@@ -350,6 +373,9 @@ main() {
     DATE_TO="$date_to"
     MIN_SIZE="$min_size"
     MAX_SIZE="$max_size"
+    IMAGES_ONLY="$images_only"
+    VIDEOS_ONLY="$videos_only"
+    FILTER_FORMAT="$filter_format"
     DIRECTORY="$directory"
     
     # Check if we have the required arguments
@@ -479,12 +505,33 @@ main() {
                 fi
             fi
             
-            # Process file
-            ((count++))
-            
             # Get file extension
             local ext="${file##*.}"
             ext=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
+
+            # File type filtering
+            local is_image=false
+            local is_video=false
+            case "$ext" in
+                jpg|jpeg|png|gif|bmp|tiff|tif|webp|heic|heif)
+                    is_image=true
+                    ;;
+                mp4|avi|mov|mkv|wmv|flv|webm|m4v|3gp|mpg|mpeg)
+                    is_video=true
+                    ;;
+            esac
+            if [ "$IMAGES_ONLY" = true ] && [ "$is_image" != true ]; then
+                continue
+            fi
+            if [ "$VIDEOS_ONLY" = true ] && [ "$is_video" != true ]; then
+                continue
+            fi
+            if [ -n "$FILTER_FORMAT" ] && [ "$ext" != "$FILTER_FORMAT" ]; then
+                continue
+            fi
+            
+            # Process file
+            ((count++))
             
             # Get file size
             total_size=$((total_size + size))
