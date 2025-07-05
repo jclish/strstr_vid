@@ -103,6 +103,11 @@ Generate comprehensive report with keyword analysis:
 ./generate_media_report.sh ~/Media
 ```
 
+Generate CSV report with comprehensive metadata:
+```bash
+./generate_media_report.sh ~/Media -f csv
+```
+
 ### Command Line Options
 
 #### Metadata Search Tool
@@ -190,9 +195,11 @@ Generate comprehensive report with keyword analysis:
 - Machine-readable format
 
 ### CSV Reports
-- Simple tabular format
-- Easy import into spreadsheets
-- Basic file information (path, type, format, size, date)
+- Comprehensive metadata export with proper CSV escaping
+- Columns: file path, type, format, size (bytes and MB), date, camera make/model, keywords, description
+- Rich metadata extraction from EXIF data (camera info, capture dates, descriptions)
+- Perfect for spreadsheet analysis and data processing
+- Handles special characters and multi-line content properly
 
 ### Keyword Analysis
 - Extracts descriptive keywords from image and video metadata
