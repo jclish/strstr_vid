@@ -19,6 +19,12 @@ A comprehensive suite of shell scripts for analyzing and searching metadata in v
   - Duplicate file detection using SHA-1 hashes
   - Resolution analysis for images and videos
   - Aspect ratio analysis (portrait/landscape/square)
+- **Advanced keyword analysis**: Sophisticated content analysis including:
+  - Keyword clustering by semantic themes
+  - Theme detection and dominant theme identification
+  - Sentiment analysis with emotional categorization
+  - Language detection for multilingual content
+  - Keyword frequency heatmap visualization
 - **Statistical analysis**: File counts, size totals, format breakdowns, camera/device analysis
 - **Keyword analysis**: Extracts and analyzes descriptive keywords for podcast transcript matching
 - **Progress tracking**: User-friendly progress bar during processing

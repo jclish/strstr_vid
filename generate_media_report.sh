@@ -541,6 +541,606 @@ analyze_aspect_ratios() {
     fi
 }
 
+# Advanced Keyword Analysis Functions
+
+# Keyword clustering - group similar keywords together
+cluster_keywords() {
+    local keywords="$1"
+    
+    echo ""
+    echo "🔗 KEYWORD CLUSTERING"
+    echo "====================="
+    
+    if [ -z "$keywords" ]; then
+        echo "No keywords available for clustering"
+        return
+    fi
+    
+    # Clean and process keywords
+    local clean_keywords=$(echo "$keywords" | \
+        sed 's/Keywords: //g' | \
+        sed 's/Subject: //g' | \
+        sed 's/Description: //g' | \
+        sed 's/Title: //g' | \
+        sed 's/Caption: //g' | \
+        sed 's/Comment: //g' | \
+        tr '[:upper:]' '[:lower:]' | \
+        tr ' ' '\n' | \
+        grep -v "^$" | \
+        grep -E "[a-z]{4,}" | \
+        grep -v -E "(make|model|date|time|original|create|modify|camera|image|video|format|file|size|bytes|adobe|stock|adobestock|handler|encoder|creation|duration|bitrate|minor|major|compatible|brands|isom|avc1|mp42)" | \
+        sort | uniq -c | sort -nr)
+    
+    if [ -z "$clean_keywords" ]; then
+        echo "No valid keywords found for clustering"
+        return
+    fi
+    
+    # Define keyword categories/clusters using simple variables
+    local mining_keywords="mine,mining,mineral,ore,extraction,drill,excavation,quarry"
+    local nature_keywords="rock,stone,geology,landscape,mountain,outdoor,natural,earth"
+    local industrial_keywords="industry,industrial,equipment,machinery,construction,manufacturing,factory"
+    local technology_keywords="digital,electronic,computer,device,modern,technology,innovation"
+    local business_keywords="business,corporate,office,professional,work,commerce,enterprise"
+    local travel_keywords="travel,tourism,landmark,location,place,destination,visit"
+    local people_keywords="person,people,worker,human,individual,portrait,face"
+    local emotion_keywords="happy,joy,excitement,emotion,feeling,mood,expression"
+    local color_keywords="color,colour,bright,dark,light,shade,tone,palette"
+    local quality_keywords="high,quality,premium,excellent,superior,professional"
+    
+    # Analyze keywords and assign to clusters
+    echo "📊 KEYWORD CLUSTERS BY THEME:"
+    echo "$clean_keywords" | while read count keyword; do
+        local found_cluster=""
+        
+        if echo "$mining_keywords" | grep -q "$keyword"; then
+            found_cluster="mining"
+        elif echo "$nature_keywords" | grep -q "$keyword"; then
+            found_cluster="nature"
+        elif echo "$industrial_keywords" | grep -q "$keyword"; then
+            found_cluster="industrial"
+        elif echo "$technology_keywords" | grep -q "$keyword"; then
+            found_cluster="technology"
+        elif echo "$business_keywords" | grep -q "$keyword"; then
+            found_cluster="business"
+        elif echo "$travel_keywords" | grep -q "$keyword"; then
+            found_cluster="travel"
+        elif echo "$people_keywords" | grep -q "$keyword"; then
+            found_cluster="people"
+        elif echo "$emotion_keywords" | grep -q "$keyword"; then
+            found_cluster="emotion"
+        elif echo "$color_keywords" | grep -q "$keyword"; then
+            found_cluster="color"
+        elif echo "$quality_keywords" | grep -q "$keyword"; then
+            found_cluster="quality"
+        fi
+        
+        if [ -n "$found_cluster" ]; then
+            printf "  %-12s: %s (%d occurrences)\n" "$found_cluster" "$keyword" "$count"
+        else
+            printf "  %-12s: %s (%d occurrences)\n" "other" "$keyword" "$count"
+        fi
+    done | head -20
+    
+    # Show cluster summary
+    echo ""
+    echo "📈 CLUSTER SUMMARY:"
+    local mining_count=0
+    local nature_count=0
+    local industrial_count=0
+    local technology_count=0
+    local business_count=0
+    local travel_count=0
+    local people_count=0
+    local emotion_count=0
+    local color_count=0
+    local quality_count=0
+    local other_count=0
+    
+    echo "$clean_keywords" | while read count keyword; do
+        if echo "$mining_keywords" | grep -q "$keyword"; then
+            mining_count=$((mining_count + count))
+        elif echo "$nature_keywords" | grep -q "$keyword"; then
+            nature_count=$((nature_count + count))
+        elif echo "$industrial_keywords" | grep -q "$keyword"; then
+            industrial_count=$((industrial_count + count))
+        elif echo "$technology_keywords" | grep -q "$keyword"; then
+            technology_count=$((technology_count + count))
+        elif echo "$business_keywords" | grep -q "$keyword"; then
+            business_count=$((business_count + count))
+        elif echo "$travel_keywords" | grep -q "$keyword"; then
+            travel_count=$((travel_count + count))
+        elif echo "$people_keywords" | grep -q "$keyword"; then
+            people_count=$((people_count + count))
+        elif echo "$emotion_keywords" | grep -q "$keyword"; then
+            emotion_count=$((emotion_count + count))
+        elif echo "$color_keywords" | grep -q "$keyword"; then
+            color_count=$((color_count + count))
+        elif echo "$quality_keywords" | grep -q "$keyword"; then
+            quality_count=$((quality_count + count))
+        else
+            other_count=$((other_count + count))
+        fi
+    done
+    
+    # Display cluster counts
+    if [ "$mining_count" -gt 0 ]; then
+        printf "  %-12s: %d keywords\n" "mining" "$mining_count"
+    fi
+    if [ "$nature_count" -gt 0 ]; then
+        printf "  %-12s: %d keywords\n" "nature" "$nature_count"
+    fi
+    if [ "$industrial_count" -gt 0 ]; then
+        printf "  %-12s: %d keywords\n" "industrial" "$industrial_count"
+    fi
+    if [ "$technology_count" -gt 0 ]; then
+        printf "  %-12s: %d keywords\n" "technology" "$technology_count"
+    fi
+    if [ "$business_count" -gt 0 ]; then
+        printf "  %-12s: %d keywords\n" "business" "$business_count"
+    fi
+    if [ "$travel_count" -gt 0 ]; then
+        printf "  %-12s: %d keywords\n" "travel" "$travel_count"
+    fi
+    if [ "$people_count" -gt 0 ]; then
+        printf "  %-12s: %d keywords\n" "people" "$people_count"
+    fi
+    if [ "$emotion_count" -gt 0 ]; then
+        printf "  %-12s: %d keywords\n" "emotion" "$emotion_count"
+    fi
+    if [ "$color_count" -gt 0 ]; then
+        printf "  %-12s: %d keywords\n" "color" "$color_count"
+    fi
+    if [ "$quality_count" -gt 0 ]; then
+        printf "  %-12s: %d keywords\n" "quality" "$quality_count"
+    fi
+    if [ "$other_count" -gt 0 ]; then
+        printf "  %-12s: %d keywords\n" "other" "$other_count"
+    fi
+}
+
+# Theme detection - identify common themes in descriptions
+detect_themes() {
+    local keywords="$1"
+    
+    echo ""
+    echo "🎯 THEME DETECTION"
+    echo "=================="
+    
+    if [ -z "$keywords" ]; then
+        echo "No keywords available for theme detection"
+        return
+    fi
+    
+    # Clean and process keywords
+    local clean_keywords=$(echo "$keywords" | \
+        sed 's/Keywords: //g' | \
+        sed 's/Subject: //g' | \
+        sed 's/Description: //g' | \
+        sed 's/Title: //g' | \
+        sed 's/Caption: //g' | \
+        sed 's/Comment: //g' | \
+        tr '[:upper:]' '[:lower:]' | \
+        tr ' ' '\n' | \
+        grep -v "^$" | \
+        grep -E "[a-z]{5,}" | \
+        grep -v -E "(make|model|date|time|original|create|modify|camera|image|video|format|file|size|bytes|adobe|stock|adobestock|handler|encoder|creation|duration|bitrate|minor|major|compatible|brands|isom|avc1|mp42)" | \
+        sort | uniq -c | sort -nr)
+    
+    if [ -z "$clean_keywords" ]; then
+        echo "No valid keywords found for theme detection"
+        return
+    fi
+    
+    # Define theme patterns using simple variables
+    local industrial_theme="mining,industry,industrial,equipment,machinery,factory,construction"
+    local nature_theme="rock,stone,geology,landscape,mountain,outdoor,natural,earth,mineral"
+    local business_theme="business,corporate,office,professional,work,commerce,enterprise"
+    local technology_theme="digital,electronic,computer,device,modern,technology,innovation"
+    local travel_theme="travel,tourism,landmark,location,place,destination,visit"
+    local people_theme="person,people,worker,human,individual,portrait,face"
+    local emotion_theme="happy,joy,excitement,emotion,feeling,mood,expression"
+    local quality_theme="high,quality,premium,excellent,superior,professional"
+    
+    # Analyze themes
+    echo "🎨 DETECTED THEMES:"
+    local industrial_count=0
+    local nature_count=0
+    local business_count=0
+    local technology_count=0
+    local travel_count=0
+    local people_count=0
+    local emotion_count=0
+    local quality_count=0
+    
+    echo "$clean_keywords" | while read count keyword; do
+        if echo "$industrial_theme" | grep -q "$keyword"; then
+            industrial_count=$((industrial_count + count))
+        elif echo "$nature_theme" | grep -q "$keyword"; then
+            nature_count=$((nature_count + count))
+        elif echo "$business_theme" | grep -q "$keyword"; then
+            business_count=$((business_count + count))
+        elif echo "$technology_theme" | grep -q "$keyword"; then
+            technology_count=$((technology_count + count))
+        elif echo "$travel_theme" | grep -q "$keyword"; then
+            travel_count=$((travel_count + count))
+        elif echo "$people_theme" | grep -q "$keyword"; then
+            people_count=$((people_count + count))
+        elif echo "$emotion_theme" | grep -q "$keyword"; then
+            emotion_count=$((emotion_count + count))
+        elif echo "$quality_theme" | grep -q "$keyword"; then
+            quality_count=$((quality_count + count))
+        fi
+    done
+    
+    # Display theme counts
+    if [ "$industrial_count" -gt 0 ]; then
+        printf "  %-12s: %d occurrences\n" "industrial" "$industrial_count"
+    fi
+    if [ "$nature_count" -gt 0 ]; then
+        printf "  %-12s: %d occurrences\n" "nature" "$nature_count"
+    fi
+    if [ "$business_count" -gt 0 ]; then
+        printf "  %-12s: %d occurrences\n" "business" "$business_count"
+    fi
+    if [ "$technology_count" -gt 0 ]; then
+        printf "  %-12s: %d occurrences\n" "technology" "$technology_count"
+    fi
+    if [ "$travel_count" -gt 0 ]; then
+        printf "  %-12s: %d occurrences\n" "travel" "$travel_count"
+    fi
+    if [ "$people_count" -gt 0 ]; then
+        printf "  %-12s: %d occurrences\n" "people" "$people_count"
+    fi
+    if [ "$emotion_count" -gt 0 ]; then
+        printf "  %-12s: %d occurrences\n" "emotion" "$emotion_count"
+    fi
+    if [ "$quality_count" -gt 0 ]; then
+        printf "  %-12s: %d occurrences\n" "quality" "$quality_count"
+    fi
+    
+    # Show dominant theme
+    echo ""
+    echo "🏆 DOMINANT THEME:"
+    local max_count=0
+    local dominant_theme=""
+    
+    if [ "$industrial_count" -gt "$max_count" ]; then
+        max_count="$industrial_count"
+        dominant_theme="industrial"
+    fi
+    if [ "$nature_count" -gt "$max_count" ]; then
+        max_count="$nature_count"
+        dominant_theme="nature"
+    fi
+    if [ "$business_count" -gt "$max_count" ]; then
+        max_count="$business_count"
+        dominant_theme="business"
+    fi
+    if [ "$technology_count" -gt "$max_count" ]; then
+        max_count="$technology_count"
+        dominant_theme="technology"
+    fi
+    if [ "$travel_count" -gt "$max_count" ]; then
+        max_count="$travel_count"
+        dominant_theme="travel"
+    fi
+    if [ "$people_count" -gt "$max_count" ]; then
+        max_count="$people_count"
+        dominant_theme="people"
+    fi
+    if [ "$emotion_count" -gt "$max_count" ]; then
+        max_count="$emotion_count"
+        dominant_theme="emotion"
+    fi
+    if [ "$quality_count" -gt "$max_count" ]; then
+        max_count="$quality_count"
+        dominant_theme="quality"
+    fi
+    
+    if [ -n "$dominant_theme" ] && [ "$max_count" -gt 0 ]; then
+        echo "  Primary theme: $dominant_theme ($max_count occurrences)"
+    else
+        echo "  No dominant theme detected"
+    fi
+}
+
+# Sentiment analysis - analyze description sentiment
+analyze_sentiment() {
+    local keywords="$1"
+    
+    echo ""
+    echo "😊 SENTIMENT ANALYSIS"
+    echo "====================="
+    
+    if [ -z "$keywords" ]; then
+        echo "No keywords available for sentiment analysis"
+        return
+    fi
+    
+    # Define sentiment keywords using simple variables
+    local positive_keywords="happy,joy,excitement,beautiful,amazing,wonderful,great,excellent,positive,success,achievement,winning,prosperous,rich,wealthy,precious,valuable"
+    local negative_keywords="sad,depressing,dangerous,risky,hazardous,poor,poverty,difficult,hard,challenging,abandoned,ruined,destroyed,damaged"
+    local neutral_keywords="neutral,standard,normal,regular,typical,common,ordinary,average,moderate"
+    local professional_keywords="professional,business,corporate,industrial,commercial,enterprise,formal,official"
+    local creative_keywords="creative,artistic,innovative,unique,original,creative,imaginative,inspirational"
+    
+    # Clean and process keywords
+    local clean_keywords=$(echo "$keywords" | \
+        sed 's/Keywords: //g' | \
+        sed 's/Subject: //g' | \
+        sed 's/Description: //g' | \
+        sed 's/Title: //g' | \
+        sed 's/Caption: //g' | \
+        sed 's/Comment: //g' | \
+        tr '[:upper:]' '[:lower:]' | \
+        tr ' ' '\n' | \
+        grep -v "^$" | \
+        grep -E "[a-z]{4,}" | \
+        grep -v -E "(make|model|date|time|original|create|modify|camera|image|video|format|file|size|bytes|adobe|stock|adobestock|handler|encoder|creation|duration|bitrate|minor|major|compatible|brands|isom|avc1|mp42)" | \
+        sort | uniq -c | sort -nr)
+    
+    if [ -z "$clean_keywords" ]; then
+        echo "No valid keywords found for sentiment analysis"
+        return
+    fi
+    
+    # Analyze sentiment
+    echo "📊 SENTIMENT BREAKDOWN:"
+    local positive_count=0
+    local negative_count=0
+    local neutral_count=0
+    local professional_count=0
+    local creative_count=0
+    
+    echo "$clean_keywords" | while read count keyword; do
+        if echo "$positive_keywords" | grep -q "$keyword"; then
+            positive_count=$((positive_count + count))
+        elif echo "$negative_keywords" | grep -q "$keyword"; then
+            negative_count=$((negative_count + count))
+        elif echo "$neutral_keywords" | grep -q "$keyword"; then
+            neutral_count=$((neutral_count + count))
+        elif echo "$professional_keywords" | grep -q "$keyword"; then
+            professional_count=$((professional_count + count))
+        elif echo "$creative_keywords" | grep -q "$keyword"; then
+            creative_count=$((creative_count + count))
+        fi
+    done
+    
+    # Display sentiment counts
+    if [ "$positive_count" -gt 0 ]; then
+        printf "  %-12s: %d occurrences\n" "positive" "$positive_count"
+    fi
+    if [ "$negative_count" -gt 0 ]; then
+        printf "  %-12s: %d occurrences\n" "negative" "$negative_count"
+    fi
+    if [ "$neutral_count" -gt 0 ]; then
+        printf "  %-12s: %d occurrences\n" "neutral" "$neutral_count"
+    fi
+    if [ "$professional_count" -gt 0 ]; then
+        printf "  %-12s: %d occurrences\n" "professional" "$professional_count"
+    fi
+    if [ "$creative_count" -gt 0 ]; then
+        printf "  %-12s: %d occurrences\n" "creative" "$creative_count"
+    fi
+    
+    # Overall sentiment score
+    echo ""
+    echo "📈 OVERALL SENTIMENT:"
+    local total_sentiment=$((positive_count + negative_count + neutral_count))
+    if [ "$total_sentiment" -gt 0 ]; then
+        local positive_percent=$((positive_count * 100 / total_sentiment))
+        local negative_percent=$((negative_count * 100 / total_sentiment))
+        local neutral_percent=$((neutral_count * 100 / total_sentiment))
+        
+        echo "  Positive: $positive_count ($positive_percent%)"
+        echo "  Negative: $negative_count ($negative_percent%)"
+        echo "  Neutral:  $neutral_count ($neutral_percent%)"
+        
+        if [ "$positive_count" -gt "$negative_count" ]; then
+            echo "  Overall: Positive sentiment"
+        elif [ "$negative_count" -gt "$positive_count" ]; then
+            echo "  Overall: Negative sentiment"
+        else
+            echo "  Overall: Neutral sentiment"
+        fi
+    else
+        echo "  No sentiment keywords detected"
+    fi
+}
+
+# Language detection - detect content language
+detect_language() {
+    local keywords="$1"
+    
+    echo ""
+    echo "🌍 LANGUAGE DETECTION"
+    echo "====================="
+    
+    if [ -z "$keywords" ]; then
+        echo "No keywords available for language detection"
+        return
+    fi
+    
+    # Clean and process keywords
+    local clean_keywords=$(echo "$keywords" | \
+        sed 's/Keywords: //g' | \
+        sed 's/Subject: //g' | \
+        sed 's/Description: //g' | \
+        sed 's/Title: //g' | \
+        sed 's/Caption: //g' | \
+        sed 's/Comment: //g' | \
+        tr '[:upper:]' '[:lower:]' | \
+        tr ' ' '\n' | \
+        grep -v "^$" | \
+        grep -E "[a-z]{4,}" | \
+        grep -v -E "(make|model|date|time|original|create|modify|camera|image|video|format|file|size|bytes|adobe|stock|adobestock|handler|encoder|creation|duration|bitrate|minor|major|compatible|brands|isom|avc1|mp42)" | \
+        sort | uniq -c | sort -nr)
+    
+    if [ -z "$clean_keywords" ]; then
+        echo "No valid keywords found for language detection"
+        return
+    fi
+    
+    # Simple language detection based on common words
+    local english_count=0
+    local spanish_count=0
+    local french_count=0
+    local german_count=0
+    local other_count=0
+    
+    # Common words in different languages
+    local english_words="the,and,or,but,for,with,by,from,this,that,these,those,is,are,was,were,be,been,have,has,had,do,does,did,will,would,could,should,may,might,can,must,shall"
+    local spanish_words="el,la,los,las,un,una,unos,unas,y,o,pero,para,con,por,desde,este,esta,estos,estas,es,son,era,eran,ser,estar,haber,tener,hacer,ir,venir,ver"
+    local french_words="le,la,les,un,une,des,et,ou,mais,pour,avec,par,de,ce,cette,ces,est,sont,était,étaient,être,avoir,faire,aller,venir,voir"
+    local german_words="der,die,das,ein,eine,einen,einer,und,oder,aber,für,mit,von,aus,bei,seit,ohne,gegen,über,unter,vor,hinter,neben,zwischen"
+    
+    echo "$clean_keywords" | while read count keyword; do
+        if echo "$english_words" | grep -q "$keyword"; then
+            english_count=$((english_count + count))
+        elif echo "$spanish_words" | grep -q "$keyword"; then
+            spanish_count=$((spanish_count + count))
+        elif echo "$french_words" | grep -q "$keyword"; then
+            french_count=$((french_count + count))
+        elif echo "$german_words" | grep -q "$keyword"; then
+            german_count=$((german_count + count))
+        else
+            other_count=$((other_count + count))
+        fi
+    done
+    
+    echo "📊 LANGUAGE BREAKDOWN:"
+    if [ "$english_count" -gt 0 ]; then
+        echo "  English: $english_count occurrences"
+    fi
+    if [ "$spanish_count" -gt 0 ]; then
+        echo "  Spanish: $spanish_count occurrences"
+    fi
+    if [ "$french_count" -gt 0 ]; then
+        echo "  French: $french_count occurrences"
+    fi
+    if [ "$german_count" -gt 0 ]; then
+        echo "  German: $german_count occurrences"
+    fi
+    if [ "$other_count" -gt 0 ]; then
+        echo "  Other: $other_count occurrences"
+    fi
+    
+    # Determine primary language
+    local max_count=0
+    local primary_language=""
+    
+    if [ "$english_count" -gt "$max_count" ]; then
+        max_count="$english_count"
+        primary_language="English"
+    fi
+    if [ "$spanish_count" -gt "$max_count" ]; then
+        max_count="$spanish_count"
+        primary_language="Spanish"
+    fi
+    if [ "$french_count" -gt "$max_count" ]; then
+        max_count="$french_count"
+        primary_language="French"
+    fi
+    if [ "$german_count" -gt "$max_count" ]; then
+        max_count="$german_count"
+        primary_language="German"
+    fi
+    
+    if [ -n "$primary_language" ]; then
+        echo ""
+        echo "🎯 PRIMARY LANGUAGE: $primary_language"
+    else
+        echo ""
+        echo "🎯 PRIMARY LANGUAGE: Undetermined"
+    fi
+}
+
+# Keyword frequency heatmap - visualize keyword distribution
+generate_keyword_heatmap() {
+    local keywords="$1"
+    
+    echo ""
+    echo "🔥 KEYWORD FREQUENCY HEATMAP"
+    echo "============================"
+    
+    if [ -z "$keywords" ]; then
+        echo "No keywords available for heatmap generation"
+        return
+    fi
+    
+    # Clean and process keywords
+    local clean_keywords=$(echo "$keywords" | \
+        sed 's/Keywords: //g' | \
+        sed 's/Subject: //g' | \
+        sed 's/Description: //g' | \
+        sed 's/Title: //g' | \
+        sed 's/Caption: //g' | \
+        sed 's/Comment: //g' | \
+        tr '[:upper:]' '[:lower:]' | \
+        tr ' ' '\n' | \
+        grep -v "^$" | \
+        grep -E "[a-z]{4,}" | \
+        grep -v -E "(make|model|date|time|original|create|modify|camera|image|video|format|file|size|bytes|adobe|stock|adobestock|handler|encoder|creation|duration|bitrate|minor|major|compatible|brands|isom|avc1|mp42)" | \
+        sort | uniq -c | sort -nr)
+    
+    if [ -z "$clean_keywords" ]; then
+        echo "No valid keywords found for heatmap generation"
+        return
+    fi
+    
+    # Get top keywords for heatmap
+    local top_keywords=$(echo "$clean_keywords" | head -15)
+    local max_count=$(echo "$top_keywords" | head -1 | awk '{print $1}')
+    
+    echo "📊 KEYWORD FREQUENCY VISUALIZATION:"
+    echo "$top_keywords" | while read count keyword; do
+        # Calculate heatmap intensity (1-10 scale)
+        local intensity=$((count * 10 / max_count))
+        if [ "$intensity" -eq 0 ]; then
+            intensity=1
+        fi
+        
+        # Create visual heatmap bar
+        local bar=""
+        for i in $(seq 1 $intensity); do
+            bar="${bar}█"
+        done
+        
+        # Pad with spaces for alignment
+        local padding=""
+        for i in $(seq $intensity 10); do
+            padding="${padding} "
+        done
+        
+        printf "  %-15s: %s%s (%d)\n" "$keyword" "$bar" "$padding" "$count"
+    done
+    
+    # Show frequency ranges
+    echo ""
+    echo "📈 FREQUENCY RANGES:"
+    local high_count=$(echo "$clean_keywords" | awk '$1 >= 10 {count++} END {print count+0}')
+    local medium_count=$(echo "$clean_keywords" | awk '$1 >= 5 && $1 < 10 {count++} END {print count+0}')
+    local low_count=$(echo "$clean_keywords" | awk '$1 < 5 {count++} END {print count+0}')
+    
+    echo "  High frequency (10+): $high_count keywords"
+    echo "  Medium frequency (5-9): $medium_count keywords"
+    echo "  Low frequency (<5): $low_count keywords"
+    
+    # Show keyword diversity
+    local total_keywords=$(echo "$clean_keywords" | wc -l)
+    local unique_keywords=$(echo "$clean_keywords" | awk '{print $2}' | sort -u | wc -l)
+    
+    echo ""
+    echo "🎯 KEYWORD DIVERSITY:"
+    echo "  Total occurrences: $total_keywords"
+    echo "  Unique keywords: $unique_keywords"
+    if [ "$total_keywords" -gt 0 ]; then
+        local avg_frequency=$(echo "scale=1; $total_keywords / $unique_keywords" | bc 2>/dev/null || echo "0")
+        echo "  Average frequency: $avg_frequency per keyword"
+    fi
+}
+
 # Main script
 main() {
     # Default values
@@ -992,6 +1592,13 @@ main() {
                 while read count word; do
                     printf "  • %s (%d occurrences)\n" "$word" "$count"
                 done
+            
+            # Advanced Keyword Analysis
+            cluster_keywords "$all_keywords"
+            detect_themes "$all_keywords"
+            analyze_sentiment "$all_keywords"
+            detect_language "$all_keywords"
+            generate_keyword_heatmap "$all_keywords"
         else
             echo "No keywords found in metadata"
         fi
