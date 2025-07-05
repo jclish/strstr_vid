@@ -569,6 +569,8 @@ cluster_keywords() {
         grep -v "^$" | \
         grep -E "[a-z]{4,}" | \
         grep -v -E "(make|model|date|time|original|create|modify|camera|image|video|format|file|size|bytes|adobe|stock|adobestock|handler|encoder|creation|duration|bitrate|minor|major|compatible|brands|isom|avc1|mp42)" | \
+        sed 's/,$//g' | \
+        sed 's/,$//g' | \
         sort | uniq -c | sort -nr)
     
     if [ -z "$clean_keywords" ]; then
@@ -723,8 +725,10 @@ detect_themes() {
         tr '[:upper:]' '[:lower:]' | \
         tr ' ' '\n' | \
         grep -v "^$" | \
-        grep -E "[a-z]{5,}" | \
+        grep -E "[a-z]{4,}" | \
         grep -v -E "(make|model|date|time|original|create|modify|camera|image|video|format|file|size|bytes|adobe|stock|adobestock|handler|encoder|creation|duration|bitrate|minor|major|compatible|brands|isom|avc1|mp42)" | \
+        sed 's/,$//g' | \
+        sed 's/,$//g' | \
         sort | uniq -c | sort -nr)
     
     if [ -z "$clean_keywords" ]; then
@@ -753,25 +757,35 @@ detect_themes() {
     local emotion_count=0
     local quality_count=0
     
-    echo "$clean_keywords" | while read count keyword; do
-        if echo "$industrial_theme" | grep -q "$keyword"; then
+    # Use a while read loop with a here-string to update counters in the main shell
+    while read count keyword; do
+        local matched=""
+        if echo "$industrial_theme" | grep -qw "$keyword"; then
             industrial_count=$((industrial_count + count))
-        elif echo "$nature_theme" | grep -q "$keyword"; then
+            matched="industrial"
+        elif echo "$nature_theme" | grep -qw "$keyword"; then
             nature_count=$((nature_count + count))
-        elif echo "$business_theme" | grep -q "$keyword"; then
+            matched="nature"
+        elif echo "$business_theme" | grep -qw "$keyword"; then
             business_count=$((business_count + count))
-        elif echo "$technology_theme" | grep -q "$keyword"; then
+            matched="business"
+        elif echo "$technology_theme" | grep -qw "$keyword"; then
             technology_count=$((technology_count + count))
-        elif echo "$travel_theme" | grep -q "$keyword"; then
+            matched="technology"
+        elif echo "$travel_theme" | grep -qw "$keyword"; then
             travel_count=$((travel_count + count))
-        elif echo "$people_theme" | grep -q "$keyword"; then
+            matched="travel"
+        elif echo "$people_theme" | grep -qw "$keyword"; then
             people_count=$((people_count + count))
-        elif echo "$emotion_theme" | grep -q "$keyword"; then
+            matched="people"
+        elif echo "$emotion_theme" | grep -qw "$keyword"; then
             emotion_count=$((emotion_count + count))
-        elif echo "$quality_theme" | grep -q "$keyword"; then
+            matched="emotion"
+        elif echo "$quality_theme" | grep -qw "$keyword"; then
             quality_count=$((quality_count + count))
+            matched="quality"
         fi
-    done
+    done <<< "$clean_keywords"
     
     # Display theme counts
     if [ "$industrial_count" -gt 0 ]; then
