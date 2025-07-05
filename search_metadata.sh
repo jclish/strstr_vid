@@ -29,6 +29,8 @@ LOCATION_RADIUS=""
 LOCATION_BOUNDING_BOX=""
 SHOW_DEVICE_STATS=false
 REVERSE_GEOCODE=false
+FUZZY_MATCH=false
+FUZZY_THRESHOLD=80
 
 # Arrays to store results for JSON/CSV output
 declare -a SEARCH_RESULTS
@@ -73,6 +75,8 @@ Options:
   --and <term>           Require all --and terms to match (boolean AND)
   --or <term>            Match if any --or term matches (boolean OR)
   --not <term>           Exclude files matching any --not term (boolean NOT)
+  --fuzzy                Enable fuzzy matching for typos and variations
+  --fuzzy-threshold <n>  Set fuzzy matching threshold (default: 80%)
   -h, --help            Show this help message
 
 Examples:
@@ -321,15 +325,29 @@ matches_advanced_search() {
 
     # NOT: Exclude if any NOT term matches
     for term in "${NOT_TERMS[@]}"; do
-        if echo "$metadata_str" | grep $grep_options -q "$term"; then
-            return 1  # Exclude file
+        if [ "$FUZZY_MATCH" = true ]; then
+            # Use fuzzy matching for NOT terms
+            if [ "$(fuzzy_match "$term" "$metadata_str" "$FUZZY_THRESHOLD")" = "1" ]; then
+                return 1  # Exclude file
+            fi
+        else
+            if echo "$metadata_str" | grep $grep_options -q "$term"; then
+                return 1  # Exclude file
+            fi
         fi
     done
 
     # AND: Require all AND terms to match
     for term in "${AND_TERMS[@]}"; do
-        if ! echo "$metadata_str" | grep $grep_options -q "$term"; then
-            return 1  # Exclude file
+        if [ "$FUZZY_MATCH" = true ]; then
+            # Use fuzzy matching for AND terms
+            if [ "$(fuzzy_match "$term" "$metadata_str" "$FUZZY_THRESHOLD")" = "0" ]; then
+                return 1  # Exclude file
+            fi
+        else
+            if ! echo "$metadata_str" | grep $grep_options -q "$term"; then
+                return 1  # Exclude file
+            fi
         fi
     done
 
@@ -337,9 +355,17 @@ matches_advanced_search() {
     if [ ${#OR_TERMS[@]} -gt 0 ]; then
         local or_matched=false
         for term in "${OR_TERMS[@]}"; do
-            if echo "$metadata_str" | grep $grep_options -q "$term"; then
-                or_matched=true
-                break
+            if [ "$FUZZY_MATCH" = true ]; then
+                # Use fuzzy matching for OR terms
+                if [ "$(fuzzy_match "$term" "$metadata_str" "$FUZZY_THRESHOLD")" = "1" ]; then
+                    or_matched=true
+                    break
+                fi
+            else
+                if echo "$metadata_str" | grep $grep_options -q "$term"; then
+                    or_matched=true
+                    break
+                fi
             fi
         done
         if [ "$or_matched" = false ]; then
@@ -377,8 +403,15 @@ search_image_metadata() {
             found=true
         fi
     else
-        if echo "$metadata_full" | grep $grep_options -q "$search_string"; then
-            found=true
+        if [ "$FUZZY_MATCH" = true ]; then
+            # Use fuzzy matching for regular search
+            if [ "$(fuzzy_match "$search_string" "$metadata_full" "$FUZZY_THRESHOLD")" = "1" ]; then
+                found=true
+            fi
+        else
+            if echo "$metadata_full" | grep $grep_options -q "$search_string"; then
+                found=true
+            fi
         fi
     fi
 
@@ -500,8 +533,15 @@ search_video_metadata() {
             found=true
         fi
     else
-        if echo "$metadata_full" | grep $grep_options -q "$search_string"; then
-            found=true
+        if [ "$FUZZY_MATCH" = true ]; then
+            # Use fuzzy matching for regular search
+            if [ "$(fuzzy_match "$search_string" "$metadata_full" "$FUZZY_THRESHOLD")" = "1" ]; then
+                found=true
+            fi
+        else
+            if echo "$metadata_full" | grep $grep_options -q "$search_string"; then
+                found=true
+            fi
         fi
     fi
 
@@ -1025,6 +1065,85 @@ reverse_geocode() {
     fi
 }
 
+# Fuzzy matching function
+fuzzy_match() {
+    local term1="$1"
+    local term2="$2"
+    local threshold="$3"
+    
+    # Convert to lowercase for case-insensitive comparison
+    local str1=$(echo "$term1" | tr '[:upper:]' '[:lower:]')
+    local str2=$(echo "$term2" | tr '[:upper:]' '[:lower:]' | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g')
+    
+    # Exact match
+    if [ "$str1" = "$str2" ]; then
+        echo "1"
+        return
+    fi
+    
+    # Check if the term is contained in the metadata (simple substring check first)
+    if echo "$str2" | grep -q "$str1"; then
+        echo "1"
+        return
+    fi
+    
+    # For fuzzy matching, check if any word in the metadata is similar to our term
+    # Split metadata into words and check each one
+    local words=$(echo "$str2" | tr ' ' '\n' | grep -v '^$')
+    while IFS= read -r word; do
+        if [ -n "$word" ]; then
+            # Check if this word is similar to our search term
+            if fuzzy_compare "$str1" "$word" "$threshold"; then
+                echo "1"
+                return
+            fi
+        fi
+    done <<< "$words"
+    
+    echo "0"
+}
+
+# Compare two words for fuzzy similarity
+fuzzy_compare() {
+    local word1="$1"
+    local word2="$2"
+    local threshold="$3"
+    
+    local len1=${#word1}
+    local len2=${#word2}
+    local max_len=$((len1 > len2 ? len1 : len2))
+    local min_len=$((len1 < len2 ? len1 : len2))
+    
+    if [ "$max_len" -eq 0 ]; then
+        return 0  # Both empty
+    fi
+    
+    # Calculate similarity based on character matches
+    local matches=0
+    local total_chars=$((len1 + len2))
+    
+    # Count matching characters (including duplicates)
+    for ((i=0; i<len1; i++)); do
+        local char1="${word1:$i:1}"
+        for ((j=0; j<len2; j++)); do
+            local char2="${word2:$j:1}"
+            if [ "$char1" = "$char2" ]; then
+                ((matches++))
+                break
+            fi
+        done
+    done
+    
+    # Calculate similarity percentage
+    local similarity=$((matches * 100 / max_len))
+    
+    if [ "$similarity" -ge "$threshold" ]; then
+        return 0  # Match
+    else
+        return 1  # No match
+    fi
+}
+
 # Main script
 main() {
     # Initialize positional arguments
@@ -1102,6 +1221,14 @@ main() {
                 ;;
             --not)
                 NOT_TERMS+=("$2")
+                shift 2
+                ;;
+            --fuzzy)
+                FUZZY_MATCH=true
+                shift
+                ;;
+            --fuzzy-threshold)
+                FUZZY_THRESHOLD="$2"
                 shift 2
                 ;;
             -h|--help)
