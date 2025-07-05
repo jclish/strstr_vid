@@ -12,11 +12,13 @@ if [ ! -f "./generate_media_report.sh" ]; then
     exit 1
 fi
 
-echo "NEW IN VERSION 2.0:"
+echo "CURRENT FEATURES:"
 echo "• Progress bar during processing"
 echo "• Keyword analysis for podcast transcript matching"
 echo "• Enhanced metadata filtering"
-echo "• Improved error handling"
+echo "• Multiple output formats (text, JSON, CSV)"
+echo "• Recursive directory analysis"
+echo "• Camera and format analysis"
 echo
 
 echo "1. Basic media report for current directory:"
@@ -31,24 +33,16 @@ echo "3. Export both JSON and CSV reports:"
 echo "   ./generate_media_report.sh ~/Videos -j -c -r"
 echo
 
-echo "4. Filter by file size (files larger than 1MB):"
-echo "   ./generate_media_report.sh ~/Media -s 1048576"
+echo "4. Verbose analysis with detailed processing info:"
+echo "   ./generate_media_report.sh ~/Media -v"
 echo
 
-echo "5. Filter by date range (2023 files only):"
-echo "   ./generate_media_report.sh ~/Photos -D 2023-01-01 -T 2023-12-31"
-echo
-
-echo "6. Verbose analysis with detailed file list:"
-echo "   ./generate_media_report.sh ~/Media -v -d"
-echo
-
-echo "7. Generate CSV report for spreadsheet analysis:"
+echo "5. Generate CSV report for spreadsheet analysis:"
 echo "   ./generate_media_report.sh ~/Pictures -f csv > media_report.csv"
 echo
 
-echo "8. Complex analysis with multiple filters:"
-echo "   ./generate_media_report.sh ~/Media -r -s 5242880 -D 2022-01-01 -j -c"
+echo "6. Recursive analysis with all output formats:"
+echo "   ./generate_media_report.sh ~/Media -r -j -c"
 echo
 
 echo "=== Common Use Cases ==="
@@ -60,16 +54,16 @@ echo "📈 Storage Analysis:"
 echo "   ./generate_media_report.sh ~/Media -r -f json | jq '.summary'"
 echo
 
-echo "📋 Device Analysis:"
-echo "   ./generate_media_report.sh ~/Photos -r -f json | jq '.files[] | select(.type == \"image\") | .metadata' | grep -i 'make\|model'"
+echo "📋 Device Analysis (extract camera info from text output):"
+echo "   ./generate_media_report.sh ~/Photos -r | grep -A 20 'Cameras found:'"
 echo
 
 echo "🔍 Keyword Analysis for Podcast Matching:"
 echo "   ./generate_media_report.sh ~/Media -r"
 echo
 
-echo "📅 Timeline Analysis:"
-echo "   ./generate_media_report.sh ~/Media -r -f csv | grep '2024' | wc -l"
+echo "📊 Format Analysis:"
+echo "   ./generate_media_report.sh ~/Media -r | grep -A 10 'Formats found:'"
 echo
 
 echo "=== Output Formats ==="
@@ -78,11 +72,15 @@ echo "JSON: Complete structured data for programmatic analysis"
 echo "CSV: Simple tabular format for spreadsheet import"
 echo
 
-echo "=== Filtering Options ==="
+echo "=== Available Options ==="
 echo "File Size: -s (min), -S (max) in bytes"
 echo "Date Range: -D (from), -T (to) in YYYY-MM-DD format"
 echo "Recursive: -r to include subdirectories"
 echo "Verbose: -v for detailed processing information"
+echo "Details: -d for detailed file information"
+echo "Format: -f text|json|csv for output format"
+echo "JSON Export: -j for JSON output"
+echo "CSV Export: -c for CSV output"
 echo
 
 echo "=== Integration Examples ==="
@@ -91,11 +89,15 @@ echo "   ./generate_media_report.sh ~/Media -r -f json > media_analysis.json"
 echo
 
 echo "Pipe to jq for specific analysis:"
-echo "   ./generate_media_report.sh ~/Media -r -f json | jq '.files | group_by(.format) | map({format: .[0].format, count: length})'"
+echo "   ./generate_media_report.sh ~/Media -r -f json | jq '.summary'"
 echo
 
 echo "Create CSV for Excel:"
 echo "   ./generate_media_report.sh ~/Media -r -f csv > media_inventory.csv"
+echo
+
+echo "Extract just the summary statistics:"
+echo "   ./generate_media_report.sh ~/Media -r -f json | jq '.summary.total_files'"
 echo
 
 echo "=== Tips ==="
@@ -105,6 +107,19 @@ echo "- Use -v flag to see detailed processing information"
 echo "- Use -d flag to see detailed file information"
 echo "- Combine -j and -c flags to export multiple formats"
 echo "- Use jq for advanced JSON processing and filtering"
-echo "- Use date filters to analyze specific time periods"
-echo "- Use size filters to focus on large files"
-echo "- Keyword analysis helps match media to podcast content" 
+echo "- Keyword analysis helps match media to podcast content"
+echo "- JSON output is perfect for programmatic analysis"
+echo "- CSV output works well with spreadsheet applications"
+echo
+
+echo "=== Testing Examples ==="
+echo "Test with a small directory:"
+echo "   ./generate_media_report.sh ."
+echo
+
+echo "Test JSON output:"
+echo "   ./generate_media_report.sh . -f json | jq ."
+echo
+
+echo "Test recursive analysis:"
+echo "   ./generate_media_report.sh ~/Downloads -r -f json | jq '.summary'" 

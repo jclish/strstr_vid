@@ -13,7 +13,6 @@ A comprehensive suite of shell scripts for analyzing and searching metadata in v
 ### 2. Media Report Generator (`generate_media_report.sh`)
 - **Comprehensive analysis**: Generates detailed reports about media collections
 - **Multiple output formats**: Text, JSON, and CSV reports
-- **Advanced filtering**: Filter by file size, date range, and media type
 - **Statistical analysis**: File counts, size totals, format breakdowns, camera/device analysis
 - **Keyword analysis**: Extracts and analyzes descriptive keywords for podcast transcript matching
 - **Progress tracking**: User-friendly progress bar during processing
@@ -94,9 +93,9 @@ Export both JSON and CSV reports:
 ./generate_media_report.sh ~/Videos -j -c -r
 ```
 
-Filter by file size and date range:
+Generate comprehensive report with keyword analysis:
 ```bash
-./generate_media_report.sh ~/Photos -s 1048576 -D 2023-01-01 -T 2024-12-31
+./generate_media_report.sh ~/Media -r
 ```
 
 Generate comprehensive report with keyword analysis:
@@ -126,10 +125,7 @@ Generate comprehensive report with keyword analysis:
 | `-d` | `--details` | Show detailed metadata for each file |
 | `-j` | `--json` | Export detailed JSON report |
 | `-c` | `--csv` | Export CSV report |
-| `-s` | `--min-size` | Minimum file size to include (bytes) |
-| `-S` | `--max-size` | Maximum file size to include (bytes) |
-| `-D` | `--date-from` | Include files from this date (YYYY-MM-DD) |
-| `-T` | `--date-to` | Include files up to this date (YYYY-MM-DD) |
+
 | `-h` | `--help` | Show help message |
 
 ## Supported File Types
