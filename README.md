@@ -198,6 +198,9 @@ Generate report with file type filtering:
 | `-R` | `--regex` | Enable regex pattern matching |
 | `-f` | `--field` | Search only a specific metadata field |
 | `-l` | `--field-list` | List all available metadata fields for each file |
+| `-o` | `--output` | Save results to file (text, JSON, or CSV format) |
+| `--json` | | Export results in JSON format |
+| `--csv` | | Export results in CSV format |
 | `-h` | `--help` | Show help message |
 
 #### Media Report Generator

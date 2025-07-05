@@ -22,6 +22,14 @@ USE_REGEX=false
 SEARCH_FIELD=""
 SHOW_FIELD_LIST=false
 OUTPUT_FILE=""
+OUTPUT_FORMAT="text"
+JSON_OUTPUT=false
+CSV_OUTPUT=false
+
+# Arrays to store results for JSON/CSV output
+declare -a SEARCH_RESULTS
+declare -a SEARCH_RESULTS_JSON
+declare -a SEARCH_RESULTS_CSV
 
 # Function to print usage
 print_usage() {
@@ -43,6 +51,8 @@ Options:
   -f, --field <field>    Search specific metadata field (e.g. Make, Model, Date)
   -l, --field-list       Show available metadata fields for files
   -o, --output <file>    Save results to file (text format)
+  --json                 Export results in JSON format
+  --csv                  Export results in CSV format
   -h, --help            Show this help message
 
 Examples:
@@ -54,6 +64,8 @@ Examples:
   $0 "Canon" /path/to/photos -f Make
   $0 "2023" /path/to/photos -f "Date/Time Original"
   $0 "" /path/to/photos -l
+  $0 "Canon" /path/to/photos --json
+  $0 "iPhone" /path/to/videos --csv -o results.csv
 
 Supported file types:
   Images: jpg, jpeg, png, gif, bmp, tiff, tif, webp, heic, heif
@@ -96,6 +108,70 @@ check_dependencies() {
     fi
 }
 
+# Function to escape CSV values
+escape_csv() {
+    local value="$1"
+    # Escape double quotes by doubling them
+    value="${value//\"/\"\"}"
+    # Wrap in quotes if contains comma, newline, or double quote
+    if [[ "$value" =~ [,\"\n\r] ]]; then
+        value="\"$value\""
+    fi
+    echo "$value"
+}
+
+# Function to generate JSON output
+generate_json_output() {
+    local search_string="$1"
+    local directory="$2"
+    local total_files="$3"
+    local found_files="$4"
+    
+    echo "{"
+    echo "  \"search_info\": {"
+    echo "    \"search_string\": $(echo "$search_string" | jq -R .),"
+    echo "    \"directory\": $(echo "$directory" | jq -R .),"
+    echo "    \"recursive\": $RECURSIVE,"
+    echo "    \"case_sensitive\": $CASE_SENSITIVE,"
+    echo "    \"use_regex\": $USE_REGEX,"
+    if [ -n "$SEARCH_FIELD" ]; then
+        echo "    \"search_field\": $(echo "$SEARCH_FIELD" | jq -R .),"
+    fi
+    echo "    \"total_files_processed\": $total_files,"
+    echo "    \"files_with_matches\": $found_files"
+    echo "  },"
+    echo "  \"results\": ["
+    
+    local first=true
+    for result in "${SEARCH_RESULTS_JSON[@]}"; do
+        if [ "$first" = true ]; then
+            first=false
+        else
+            echo ","
+        fi
+        echo "$result"
+    done
+    
+    echo "  ]"
+    echo "}"
+}
+
+# Function to generate CSV output
+generate_csv_output() {
+    local search_string="$1"
+    local directory="$2"
+    local total_files="$3"
+    local found_files="$4"
+    
+    # CSV header
+    echo "File Path,File Type,Search String,Search Field,Match Type,File Size,Last Modified"
+    
+    # CSV data rows
+    for result in "${SEARCH_RESULTS_CSV[@]}"; do
+        echo "$result"
+    done
+}
+
 # Function to search in image metadata
 search_image_metadata() {
     local file="$1"
@@ -118,6 +194,31 @@ search_image_metadata() {
     if exiftool "$file" 2>/dev/null | grep $grep_options -q "$search_string"; then
         found=true
         echo -e "${GREEN}✓ Found in image: $file${NC}"
+        
+        # Collect data for JSON/CSV output
+        if [ "$JSON_OUTPUT" = true ] || [ "$CSV_OUTPUT" = true ]; then
+            local file_size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "0")
+            local last_modified=$(stat -f%m "$file" 2>/dev/null || stat -c%Y "$file" 2>/dev/null || echo "0")
+            local file_type="image"
+            
+            if [ "$JSON_OUTPUT" = true ]; then
+                local json_result="    {"
+                json_result="$json_result\n      \"file_path\": $(echo "$file" | jq -R .),"
+                json_result="$json_result\n      \"file_type\": \"$file_type\","
+                json_result="$json_result\n      \"search_string\": $(echo "$search_string" | jq -R .),"
+                json_result="$json_result\n      \"search_field\": $(echo "${SEARCH_FIELD:-""}" | jq -R .),"
+                json_result="$json_result\n      \"match_type\": \"metadata\","
+                json_result="$json_result\n      \"file_size\": $file_size,"
+                json_result="$json_result\n      \"last_modified\": $last_modified"
+                json_result="$json_result\n    }"
+                SEARCH_RESULTS_JSON+=("$json_result")
+            fi
+            
+            if [ "$CSV_OUTPUT" = true ]; then
+                local csv_result="$(escape_csv "$file"),$(escape_csv "$file_type"),$(escape_csv "$search_string"),$(escape_csv "${SEARCH_FIELD:-""}"),$(escape_csv "metadata"),$(escape_csv "$file_size"),$(escape_csv "$last_modified")"
+                SEARCH_RESULTS_CSV+=("$csv_result")
+            fi
+        fi
         
         if [ "$SHOW_METADATA" = true ]; then
             echo -e "${YELLOW}Full metadata:${NC}"
@@ -151,6 +252,31 @@ search_video_metadata() {
     if ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null | grep $grep_options -q "$search_string"; then
         found=true
         echo -e "${GREEN}✓ Found in video: $file${NC}"
+        
+        # Collect data for JSON/CSV output
+        if [ "$JSON_OUTPUT" = true ] || [ "$CSV_OUTPUT" = true ]; then
+            local file_size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "0")
+            local last_modified=$(stat -f%m "$file" 2>/dev/null || stat -c%Y "$file" 2>/dev/null || echo "0")
+            local file_type="video"
+            
+            if [ "$JSON_OUTPUT" = true ]; then
+                local json_result="    {"
+                json_result="$json_result\n      \"file_path\": $(echo "$file" | jq -R .),"
+                json_result="$json_result\n      \"file_type\": \"$file_type\","
+                json_result="$json_result\n      \"search_string\": $(echo "$search_string" | jq -R .),"
+                json_result="$json_result\n      \"search_field\": $(echo "${SEARCH_FIELD:-""}" | jq -R .),"
+                json_result="$json_result\n      \"match_type\": \"metadata\","
+                json_result="$json_result\n      \"file_size\": $file_size,"
+                json_result="$json_result\n      \"last_modified\": $last_modified"
+                json_result="$json_result\n    }"
+                SEARCH_RESULTS_JSON+=("$json_result")
+            fi
+            
+            if [ "$CSV_OUTPUT" = true ]; then
+                local csv_result="$(escape_csv "$file"),$(escape_csv "$file_type"),$(escape_csv "$search_string"),$(escape_csv "${SEARCH_FIELD:-""}"),$(escape_csv "metadata"),$(escape_csv "$file_size"),$(escape_csv "$last_modified")"
+                SEARCH_RESULTS_CSV+=("$csv_result")
+            fi
+        fi
         
         if [ "$SHOW_METADATA" = true ]; then
             echo -e "${YELLOW}Full metadata:${NC}"
@@ -197,6 +323,32 @@ search_field_metadata() {
                     echo -e "${GREEN}✓ Found '$search_string' in field '$field' of image: $file${NC}"
                     echo -e "${CYAN}  Field value: $field_value${NC}"
                     
+                    # Collect data for JSON/CSV output
+                    if [ "$JSON_OUTPUT" = true ] || [ "$CSV_OUTPUT" = true ]; then
+                        local file_size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "0")
+                        local last_modified=$(stat -f%m "$file" 2>/dev/null || stat -c%Y "$file" 2>/dev/null || echo "0")
+                        local file_type="image"
+                        
+                        if [ "$JSON_OUTPUT" = true ]; then
+                            local json_result="    {"
+                            json_result="$json_result\n      \"file_path\": $(echo "$file" | jq -R .),"
+                            json_result="$json_result\n      \"file_type\": \"$file_type\","
+                            json_result="$json_result\n      \"search_string\": $(echo "$search_string" | jq -R .),"
+                            json_result="$json_result\n      \"search_field\": $(echo "$field" | jq -R .),"
+                            json_result="$json_result\n      \"match_type\": \"field_specific\","
+                            json_result="$json_result\n      \"field_value\": $(echo "$field_value" | jq -R .),"
+                            json_result="$json_result\n      \"file_size\": $file_size,"
+                            json_result="$json_result\n      \"last_modified\": $last_modified"
+                            json_result="$json_result\n    }"
+                            SEARCH_RESULTS_JSON+=("$json_result")
+                        fi
+                        
+                        if [ "$CSV_OUTPUT" = true ]; then
+                            local csv_result="$(escape_csv "$file"),$(escape_csv "$file_type"),$(escape_csv "$search_string"),$(escape_csv "$field"),$(escape_csv "field_specific"),$(escape_csv "$file_size"),$(escape_csv "$last_modified")"
+                            SEARCH_RESULTS_CSV+=("$csv_result")
+                        fi
+                    fi
+                    
                     if [ "$SHOW_METADATA" = true ]; then
                         echo -e "${YELLOW}Full metadata:${NC}"
                         exiftool "$file" 2>/dev/null | sed 's/^/  /'
@@ -223,6 +375,32 @@ search_field_metadata() {
                     found=true
                     echo -e "${GREEN}✓ Found '$search_string' in field '$field' of video: $file${NC}"
                     echo -e "${CYAN}  Field value: $field_value${NC}"
+                    
+                    # Collect data for JSON/CSV output
+                    if [ "$JSON_OUTPUT" = true ] || [ "$CSV_OUTPUT" = true ]; then
+                        local file_size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "0")
+                        local last_modified=$(stat -f%m "$file" 2>/dev/null || stat -c%Y "$file" 2>/dev/null || echo "0")
+                        local file_type="video"
+                        
+                        if [ "$JSON_OUTPUT" = true ]; then
+                            local json_result="    {"
+                            json_result="$json_result\n      \"file_path\": $(echo "$file" | jq -R .),"
+                            json_result="$json_result\n      \"file_type\": \"$file_type\","
+                            json_result="$json_result\n      \"search_string\": $(echo "$search_string" | jq -R .),"
+                            json_result="$json_result\n      \"search_field\": $(echo "$field" | jq -R .),"
+                            json_result="$json_result\n      \"match_type\": \"field_specific\","
+                            json_result="$json_result\n      \"field_value\": $(echo "$field_value" | jq -R .),"
+                            json_result="$json_result\n      \"file_size\": $file_size,"
+                            json_result="$json_result\n      \"last_modified\": $last_modified"
+                            json_result="$json_result\n    }"
+                            SEARCH_RESULTS_JSON+=("$json_result")
+                        fi
+                        
+                        if [ "$CSV_OUTPUT" = true ]; then
+                            local csv_result="$(escape_csv "$file"),$(escape_csv "$file_type"),$(escape_csv "$search_string"),$(escape_csv "$field"),$(escape_csv "field_specific"),$(escape_csv "$file_size"),$(escape_csv "$last_modified")"
+                            SEARCH_RESULTS_CSV+=("$csv_result")
+                        fi
+                    fi
                     
                     if [ "$SHOW_METADATA" = true ]; then
                         echo -e "${YELLOW}Full metadata:${NC}"
@@ -336,6 +514,10 @@ search_directory() {
     echo -e "${BLUE}Search Summary:${NC}"
     echo -e "  Total files processed: $total_files"
     echo -e "  Files with matches: $found_files"
+    
+    # Return counts for JSON/CSV output
+    SEARCH_TOTAL_FILES=$total_files
+    SEARCH_FOUND_FILES=$found_files
 }
 
 # Main script
@@ -380,6 +562,14 @@ main() {
             -o|--output)
                 OUTPUT_FILE="$2"
                 shift 2
+                ;;
+            --json)
+                JSON_OUTPUT=true
+                shift
+                ;;
+            --csv)
+                CSV_OUTPUT=true
+                shift
                 ;;
             -h|--help)
                 print_usage
@@ -442,7 +632,7 @@ main() {
     fi
     echo
 
-    # At the start of main(), after argument parsing and before any output:
+    # Handle output redirection for different formats
     local temp_output=""
     if [ -n "$OUTPUT_FILE" ]; then
         temp_output=$(mktemp)
@@ -453,13 +643,40 @@ main() {
     # Perform the search
     search_directory "$directory" "$search_string"
 
-    # At the end of main(), after all output:
-    if [ -n "$OUTPUT_FILE" ]; then
-        exec 1>&3
-        exec 3>&-
-        cp "$temp_output" "$OUTPUT_FILE"
-        rm "$temp_output"
-        echo -e "${GREEN}Results saved to: $OUTPUT_FILE${NC}"
+    # Generate format-specific output
+    if [ "$JSON_OUTPUT" = true ]; then
+        if [ -n "$OUTPUT_FILE" ]; then
+            # Redirect JSON output to file
+            generate_json_output "$search_string" "$directory" "$SEARCH_TOTAL_FILES" "$SEARCH_FOUND_FILES" > "$OUTPUT_FILE"
+            exec 1>&3
+            exec 3>&-
+            rm "$temp_output"
+            echo -e "${GREEN}JSON results saved to: $OUTPUT_FILE${NC}"
+        else
+            echo
+            generate_json_output "$search_string" "$directory" "$SEARCH_TOTAL_FILES" "$SEARCH_FOUND_FILES"
+        fi
+    elif [ "$CSV_OUTPUT" = true ]; then
+        if [ -n "$OUTPUT_FILE" ]; then
+            # Redirect CSV output to file
+            generate_csv_output "$search_string" "$directory" "$SEARCH_TOTAL_FILES" "$SEARCH_FOUND_FILES" > "$OUTPUT_FILE"
+            exec 1>&3
+            exec 3>&-
+            rm "$temp_output"
+            echo -e "${GREEN}CSV results saved to: $OUTPUT_FILE${NC}"
+        else
+            echo
+            generate_csv_output "$search_string" "$directory" "$SEARCH_TOTAL_FILES" "$SEARCH_FOUND_FILES"
+        fi
+    else
+        # Regular text output
+        if [ -n "$OUTPUT_FILE" ]; then
+            exec 1>&3
+            exec 3>&-
+            cp "$temp_output" "$OUTPUT_FILE"
+            rm "$temp_output"
+            echo -e "${GREEN}Results saved to: $OUTPUT_FILE${NC}"
+        fi
     fi
 }
 
