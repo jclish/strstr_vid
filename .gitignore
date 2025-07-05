@@ -30,4 +30,8 @@ sample_media/
 
 # Script output files
 output/
-results/ 
+results/
+
+# Ignore all .txt and .json files (test/output)
+*.txt
+*.json 
