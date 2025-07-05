@@ -1697,8 +1697,8 @@ main() {
         generate_text=true
     fi
     
-    # Only show progress and text output for text format
-    if [ "$generate_text" = true ]; then
+    # Only show progress and text output for text format, and only when not doing multiple exports
+    if [ "$generate_text" = true ] && [ "$EXPORT_JSON" != true ] && [ "$EXPORT_CSV" != true ] && [ "$EXPORT_HTML" != true ] && [ "$EXPORT_MARKDOWN" != true ] && [ "$EXPORT_XML" != true ]; then
         # Set up output redirection if save-report is specified
         local report_output=""
         if [ -n "$SAVE_REPORT" ]; then
