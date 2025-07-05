@@ -164,12 +164,36 @@ generate_csv_output() {
     local found_files="$4"
     
     # CSV header
-    echo "File Path,File Type,Search String,Search Field,Match Type,File Size,Last Modified"
+    echo "File Path,File Type,Search String,Search Field,Match Type,File Size,Last Modified,GPS Latitude,GPS Longitude"
     
     # CSV data rows
     for result in "${SEARCH_RESULTS_CSV[@]}"; do
         echo "$result"
     done
+}
+
+# Helper: Extract GPS from exiftool output
+extract_gps_from_exiftool() {
+    local file="$1"
+    local lat=""
+    local lon=""
+    local gps_data
+    gps_data=$(exiftool -c '%.8f' -GPSLatitude -GPSLongitude "$file" 2>/dev/null)
+    lat=$(echo "$gps_data" | awk -F': ' '/GPS Latitude/ {print $2}' | head -1)
+    lon=$(echo "$gps_data" | awk -F': ' '/GPS Longitude/ {print $2}' | head -1)
+    echo "$lat|$lon"
+}
+
+# Helper: Extract GPS from ffprobe output (if present)
+extract_gps_from_ffprobe() {
+    local file="$1"
+    local lat=""
+    local lon=""
+    local ffprobe_json
+    ffprobe_json=$(ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null)
+    lat=$(echo "$ffprobe_json" | grep -E 'location|latitude' | grep -o '[-0-9.]*' | head -1)
+    lon=$(echo "$ffprobe_json" | grep -E 'location|longitude' | grep -o '[-0-9.]*' | tail -1)
+    echo "$lat|$lon"
 }
 
 # Function to search in image metadata
@@ -201,6 +225,13 @@ search_image_metadata() {
             local last_modified=$(stat -f%m "$file" 2>/dev/null || stat -c%Y "$file" 2>/dev/null || echo "0")
             local file_type="image"
             
+            # GPS extraction
+            local gps_lat=""
+            local gps_lon=""
+            gps_latlon=$(extract_gps_from_exiftool "$file")
+            gps_lat="${gps_latlon%%|*}"
+            gps_lon="${gps_latlon##*|}"
+
             if [ "$JSON_OUTPUT" = true ]; then
                 local json_result="    {"
                 json_result="$json_result\n      \"file_path\": $(echo "$file" | jq -R .),"
@@ -209,13 +240,14 @@ search_image_metadata() {
                 json_result="$json_result\n      \"search_field\": $(echo "${SEARCH_FIELD:-""}" | jq -R .),"
                 json_result="$json_result\n      \"match_type\": \"metadata\","
                 json_result="$json_result\n      \"file_size\": $file_size,"
-                json_result="$json_result\n      \"last_modified\": $last_modified"
+                json_result="$json_result\n      \"last_modified\": $last_modified,"
+                json_result="$json_result\n      \"gps_latitude\": $(echo "$gps_lat" | jq -R .),\n      \"gps_longitude\": $(echo "$gps_lon" | jq -R .)"
                 json_result="$json_result\n    }"
                 SEARCH_RESULTS_JSON+=("$json_result")
             fi
             
             if [ "$CSV_OUTPUT" = true ]; then
-                local csv_result="$(escape_csv "$file"),$(escape_csv "$file_type"),$(escape_csv "$search_string"),$(escape_csv "${SEARCH_FIELD:-""}"),$(escape_csv "metadata"),$(escape_csv "$file_size"),$(escape_csv "$last_modified")"
+                local csv_result="$(escape_csv "$file"),$(escape_csv "$file_type"),$(escape_csv "$search_string"),$(escape_csv "${SEARCH_FIELD:-""}"),$(escape_csv "metadata"),$(escape_csv "$file_size"),$(escape_csv "$last_modified"),$(escape_csv "$gps_lat"),$(escape_csv "$gps_lon")"
                 SEARCH_RESULTS_CSV+=("$csv_result")
             fi
         fi
@@ -223,6 +255,9 @@ search_image_metadata() {
         if [ "$SHOW_METADATA" = true ]; then
             echo -e "${YELLOW}Full metadata:${NC}"
             exiftool "$file" 2>/dev/null | sed 's/^/  /'
+            if [ -n "$gps_lat" ] && [ -n "$gps_lon" ]; then
+                echo -e "${CYAN}  GPS: $gps_lat, $gps_lon${NC}"
+            fi
             echo
         fi
     fi
@@ -259,6 +294,18 @@ search_video_metadata() {
             local last_modified=$(stat -f%m "$file" 2>/dev/null || stat -c%Y "$file" 2>/dev/null || echo "0")
             local file_type="video"
             
+            # GPS extraction
+            local gps_lat=""
+            local gps_lon=""
+            gps_latlon=$(extract_gps_from_exiftool "$file")
+            gps_lat="${gps_latlon%%|*}"
+            gps_lon="${gps_latlon##*|}"
+            if [ -z "$gps_lat" ] && [ -z "$gps_lon" ]; then
+                gps_latlon=$(extract_gps_from_ffprobe "$file")
+                gps_lat="${gps_latlon%%|*}"
+                gps_lon="${gps_latlon##*|}"
+            fi
+
             if [ "$JSON_OUTPUT" = true ]; then
                 local json_result="    {"
                 json_result="$json_result\n      \"file_path\": $(echo "$file" | jq -R .),"
@@ -267,13 +314,14 @@ search_video_metadata() {
                 json_result="$json_result\n      \"search_field\": $(echo "${SEARCH_FIELD:-""}" | jq -R .),"
                 json_result="$json_result\n      \"match_type\": \"metadata\","
                 json_result="$json_result\n      \"file_size\": $file_size,"
-                json_result="$json_result\n      \"last_modified\": $last_modified"
+                json_result="$json_result\n      \"last_modified\": $last_modified,"
+                json_result="$json_result\n      \"gps_latitude\": $(echo "$gps_lat" | jq -R .),\n      \"gps_longitude\": $(echo "$gps_lon" | jq -R .)"
                 json_result="$json_result\n    }"
                 SEARCH_RESULTS_JSON+=("$json_result")
             fi
             
             if [ "$CSV_OUTPUT" = true ]; then
-                local csv_result="$(escape_csv "$file"),$(escape_csv "$file_type"),$(escape_csv "$search_string"),$(escape_csv "${SEARCH_FIELD:-""}"),$(escape_csv "metadata"),$(escape_csv "$file_size"),$(escape_csv "$last_modified")"
+                local csv_result="$(escape_csv "$file"),$(escape_csv "$file_type"),$(escape_csv "$search_string"),$(escape_csv "${SEARCH_FIELD:-""}"),$(escape_csv "metadata"),$(escape_csv "$file_size"),$(escape_csv "$last_modified"),$(escape_csv "$gps_lat"),$(escape_csv "$gps_lon")"
                 SEARCH_RESULTS_CSV+=("$csv_result")
             fi
         fi
@@ -281,6 +329,9 @@ search_video_metadata() {
         if [ "$SHOW_METADATA" = true ]; then
             echo -e "${YELLOW}Full metadata:${NC}"
             ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null | python3 -m json.tool 2>/dev/null || ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null
+            if [ -n "$gps_lat" ] && [ -n "$gps_lon" ]; then
+                echo -e "${CYAN}  GPS: $gps_lat, $gps_lon${NC}"
+            fi
             echo
         fi
     fi

@@ -431,3 +431,64 @@ chmod +x search_metadata.sh
 ## License
 
 This script is provided as-is for educational and personal use. 
+
+### Options
+
+- `-v`, `--verbose`          Show detailed output including full metadata
+- `-i`, `--case-insensitive` Case-insensitive search (default: case-sensitive)
+- `-r`, `--recursive`        Search recursively in subdirectories
+- `-m`, `--show-metadata`    Show full metadata for matching files
+- `-R`, `--regex`            Enable regex pattern matching (default: simple string search)
+- `-f`, `--field <field>`    Search specific metadata field (e.g. Make, Model, Date)
+- `-l`, `--field-list`       Show available metadata fields for files
+- `-o`, `--output <file>`    Save results to file (text, JSON, or CSV format)
+- `--json`                   Export results in JSON format
+- `--csv`                    Export results in CSV format
+- `-h`, `--help`             Show help message
+
+**New:**
+- GPS coordinates (latitude/longitude) are automatically extracted from image and video files (if present) and included in all output formats.
+
+### Examples
+
+```sh
+# Export results in JSON format, including GPS coordinates if available
+./search_metadata.sh "Canon" /path/to/photos --json
+
+# Export results in CSV format and save to file (with GPS columns)
+./search_metadata.sh "Canon" /path/to/photos --csv -o results.csv
+```
+
+### Output Formats
+
+- **JSON (`--json`):**
+  - Now includes `gps_latitude` and `gps_longitude` fields for each result (empty if not present).
+  - Example:
+
+```json
+{
+  "search_info": { ... },
+  "results": [
+    {
+      "file_path": "/path/to/photos/img1.jpg",
+      "file_type": "image",
+      "search_string": "Canon",
+      ...
+      "gps_latitude": "37.77490000",
+      "gps_longitude": "-122.41940000"
+    }
+  ]
+}
+```
+
+- **CSV (`--csv`):**
+  - Now includes `GPS Latitude` and `GPS Longitude` columns.
+  - Example:
+
+```
+File Path,File Type,Search String,Search Field,Match Type,File Size,Last Modified,GPS Latitude,GPS Longitude
+/path/to/photos/img1.jpg,image,Canon,,metadata,123456,1680000000,37.77490000,-122.41940000
+```
+
+- **Text:**
+  - If GPS coordinates are found, they are shown in the match details. 
