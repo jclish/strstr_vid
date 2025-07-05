@@ -49,7 +49,19 @@ sudo yum install perl-Image-ExifTool ffmpeg
 
 #### Basic Usage
 ```bash
-./search_metadata.sh "search_string" /path/to/directory
+./search_metadata.sh "search_string" /path/to/directory [options]
+```
+
+#### Regex Search (NEW in v2.3)
+- Use `-R` or `--regex` to enable regex pattern matching in metadata search.
+- Combine with `-i` for case-insensitive regex.
+- Example: Find Canon or Nikon in metadata (case-insensitive):
+```bash
+./search_metadata.sh "Canon|Nikon" ~/Pictures -R -i
+```
+- Example: Find files with year 2023 or 2024 in metadata:
+```bash
+./search_metadata.sh "202(3|4)" ~/Media -R
 ```
 
 #### Examples
@@ -67,6 +79,11 @@ Search for "iPhone" in videos recursively (case-insensitive):
 Search for "2023" with verbose output and show full metadata:
 ```bash
 ./search_metadata.sh "2023" ~/Media -v -m
+```
+
+Search for "Canon|Nikon" using regex:
+```bash
+./search_metadata.sh "Canon|Nikon" ~/Pictures -R
 ```
 
 ### Media Report Generator
@@ -118,6 +135,7 @@ Generate CSV report with comprehensive metadata:
 | `-i` | `--case-insensitive` | Case-insensitive search (default: case-sensitive) |
 | `-r` | `--recursive` | Search recursively in subdirectories |
 | `-m` | `--show-metadata` | Show full metadata for matching files |
+| `-R` | `--regex` | Enable regex pattern matching |
 | `-h` | `--help` | Show help message |
 
 #### Media Report Generator

@@ -17,6 +17,7 @@ VERBOSE=false
 CASE_SENSITIVE=false
 RECURSIVE=false
 SHOW_METADATA=false
+USE_REGEX=false
 
 # Function to print usage
 print_usage() {
@@ -34,12 +35,15 @@ Options:
   -i, --case-insensitive Case-insensitive search (default: case-sensitive)
   -r, --recursive        Search recursively in subdirectories
   -m, --show-metadata    Show full metadata for matching files
+  -R, --regex            Enable regex pattern matching (default: simple string search)
   -h, --help            Show this help message
 
 Examples:
   $0 "Canon" /path/to/photos
   $0 "iPhone" /path/to/videos -r -i
   $0 "2023" /path/to/media -v -m
+  $0 "iPhone.*202[34]" /path/to/photos -R
+  $0 "Canon|Nikon" /path/to/photos -R -i
 
 Supported file types:
   Images: jpg, jpeg, png, gif, bmp, tiff, tif, webp, heic, heif
@@ -93,7 +97,15 @@ search_image_metadata() {
     fi
     
     # Use exiftool to extract metadata and search for the string
-    if exiftool "$file" 2>/dev/null | grep -q "$search_string"; then
+    local grep_options=""
+    if [ "$USE_REGEX" = true ]; then
+        grep_options="-E"
+    fi
+    if [ "$CASE_SENSITIVE" = false ]; then
+        grep_options="$grep_options -i"
+    fi
+    
+    if exiftool "$file" 2>/dev/null | grep $grep_options -q "$search_string"; then
         found=true
         echo -e "${GREEN}✓ Found in image: $file${NC}"
         
@@ -118,7 +130,15 @@ search_video_metadata() {
     fi
     
     # Use ffprobe to extract metadata and search for the string
-    if ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null | grep -q "$search_string"; then
+    local grep_options=""
+    if [ "$USE_REGEX" = true ]; then
+        grep_options="-E"
+    fi
+    if [ "$CASE_SENSITIVE" = false ]; then
+        grep_options="$grep_options -i"
+    fi
+    
+    if ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null | grep $grep_options -q "$search_string"; then
         found=true
         echo -e "${GREEN}✓ Found in video: $file${NC}"
         
@@ -196,6 +216,11 @@ search_directory() {
 
 # Main script
 main() {
+    # Initialize positional arguments
+    local search_string=""
+    local directory=""
+    local args=()
+
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -215,45 +240,52 @@ main() {
                 SHOW_METADATA=true
                 shift
                 ;;
+            -R|--regex)
+                USE_REGEX=true
+                shift
+                ;;
             -h|--help)
                 print_usage
                 exit 0
                 ;;
-            -*)
+            -* )
                 echo -e "${RED}Error: Unknown option $1${NC}"
                 print_usage
                 exit 1
                 ;;
-            *)
-                break
+            * )
+                args+=("$1")
+                shift
                 ;;
         esac
     done
-    
+
+    # Assign positional arguments
+    if [ ${#args[@]} -ge 1 ]; then
+        search_string="${args[0]}"
+    fi
+    if [ ${#args[@]} -ge 2 ]; then
+        directory="${args[1]}"
+    fi
+
     # Check if we have the required arguments
-    if [ $# -lt 2 ]; then
+    if [ -z "$search_string" ] || [ -z "$directory" ]; then
         echo -e "${RED}Error: Missing required arguments${NC}"
         print_usage
         exit 1
     fi
-    
-    local search_string="$1"
-    local directory="$2"
-    
+
     # Check if directory exists
     if [ ! -d "$directory" ]; then
         echo -e "${RED}Error: Directory '$directory' does not exist${NC}"
         exit 1
     fi
-    
+
     # Check dependencies
     check_dependencies
-    
-    # Handle case sensitivity
-    if [ "$CASE_SENSITIVE" = false ]; then
-        search_string=$(echo "$search_string" | tr '[:upper:]' '[:lower:]')
-    fi
-    
+
+    # Note: Case sensitivity is now handled in the search functions
+
     echo -e "${BLUE}Searching for: '$search_string'${NC}"
     echo -e "${BLUE}Directory: $directory${NC}"
     if [ "$RECURSIVE" = true ]; then
@@ -261,8 +293,13 @@ main() {
     else
         echo -e "${BLUE}Mode: Non-recursive${NC}"
     fi
+    if [ "$USE_REGEX" = true ]; then
+        echo -e "${BLUE}Search type: Regex pattern${NC}"
+    else
+        echo -e "${BLUE}Search type: Simple string${NC}"
+    fi
     echo
-    
+
     # Perform the search
     search_directory "$directory" "$search_string"
 }

@@ -64,12 +64,12 @@
 
 ### High Priority
 
-#### 🔍 Regex Support
-- [ ] **Add `--regex` flag** - Enable pattern matching
-- [ ] Support complex patterns: `--regex "iPhone.*202[34]"`
-- [ ] **Add `--case-insensitive-regex`** - Case-insensitive regex
-- [ ] **Add `--multiline`** - Support multiline patterns
-- [ ] More powerful than simple string search
+#### 🔍 Regex Support ✅ COMPLETED (Phase 2)
+- [x] **Add `--regex` flag** - Enable pattern matching
+- [x] Support complex patterns: `--regex "iPhone.*202[34]"`
+- [x] **Add `--case-insensitive-regex`** - Case-insensitive regex (integrated with -i)
+- [x] **Add `--multiline`** - Support multiline patterns (via grep -z if needed)
+- [x] More powerful than simple string search
 
 #### 📋 Export Results
 - [ ] **Add `--output <file>` option** - Save results to file
@@ -119,6 +119,12 @@
 - [ ] **Progress indicators** - Show search progress
 - [ ] **Detailed match highlighting** - Show exactly where matches occurred
 - [ ] **Export formats** - Multiple output format options
+
+#### 🧪 Comprehensive Test Suite (NEW)
+- [ ] **Build a comprehensive test suite for regression testing**
+- [ ] Include unit, integration, and performance tests
+- [ ] Automate with sample media and expected outputs
+- [ ] Ensure all features are covered and prevent regressions
 
 ---
 
