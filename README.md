@@ -13,6 +13,12 @@ A comprehensive suite of shell scripts for analyzing and searching metadata in v
 ### 2. Media Report Generator (`generate_media_report.sh`)
 - **Comprehensive analysis**: Generates detailed reports about media collections
 - **Multiple output formats**: Text, JSON, and CSV reports
+- **Enhanced statistics**: Advanced analytics including:
+  - Average file sizes by format
+  - Storage usage trends with size distributions
+  - Duplicate file detection using SHA-1 hashes
+  - Resolution analysis for images and videos
+  - Aspect ratio analysis (portrait/landscape/square)
 - **Statistical analysis**: File counts, size totals, format breakdowns, camera/device analysis
 - **Keyword analysis**: Extracts and analyzes descriptive keywords for podcast transcript matching
 - **Progress tracking**: User-friendly progress bar during processing

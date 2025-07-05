@@ -271,6 +271,276 @@ parse_date_to_timestamp() {
     fi
 }
 
+# Enhanced Statistics Functions
+
+# Calculate average file sizes by format
+calculate_format_averages() {
+    local format_sizes="$1"
+    echo "📊 AVERAGE FILE SIZES BY FORMAT"
+    echo "================================"
+    
+    if [ -z "$format_sizes" ]; then
+        echo "No file size data available"
+        return
+    fi
+    
+    # Process format sizes and calculate averages
+    echo "$format_sizes" | grep -v "^$" | while IFS=':' read -r format size; do
+        if [ -n "$format" ] && [ -n "$size" ]; then
+            echo "$format:$size"
+        fi
+    done | awk -F: '
+    {
+        format = $1
+        size = $2
+        if (format in sizes) {
+            sizes[format] += size
+            counts[format]++
+        } else {
+            sizes[format] = size
+            counts[format] = 1
+        }
+    }
+    END {
+        for (format in sizes) {
+            avg = sizes[format] / counts[format]
+            avg_mb = avg / 1024 / 1024
+            printf "  %-8s: %d files, avg %.1f MB (%.0f bytes)\n", 
+                   format, counts[format], avg_mb, avg
+        }
+    }' | sort -k2 -nr
+}
+
+# Analyze storage usage trends
+analyze_storage_trends() {
+    local image_sizes="$1"
+    local video_sizes="$2"
+    
+    echo ""
+    echo "📈 STORAGE USAGE TRENDS"
+    echo "========================"
+    
+    if [ -z "$image_sizes" ] && [ -z "$video_sizes" ]; then
+        echo "No size data available for trend analysis"
+        return
+    fi
+    
+    # Analyze image sizes
+    if [ -n "$image_sizes" ]; then
+        local image_count=$(echo "$image_sizes" | grep -v "^$" | wc -l)
+        if [ "$image_count" -gt 0 ]; then
+            local total_image_size=$(echo "$image_sizes" | grep -v "^$" | awk '{sum += $1} END {print sum}')
+            local avg_image_size=$(echo "scale=0; $total_image_size / $image_count" | bc 2>/dev/null || echo "0")
+            local avg_image_mb=$(echo "scale=1; $avg_image_size / 1024 / 1024" | bc 2>/dev/null || echo "0")
+            
+            echo "📷 Images: $image_count files"
+            echo "  Total size: $(echo "scale=1; $total_image_size / 1024 / 1024" | bc 2>/dev/null || echo "0") MB"
+            echo "  Average size: ${avg_image_mb} MB"
+            
+            # Size distribution
+            local small_count=$(echo "$image_sizes" | grep -v "^$" | awk '$1 < 1024*1024 {count++} END {print count+0}')
+            local medium_count=$(echo "$image_sizes" | grep -v "^$" | awk '$1 >= 1024*1024 && $1 < 10*1024*1024 {count++} END {print count+0}')
+            local large_count=$(echo "$image_sizes" | grep -v "^$" | awk '$1 >= 10*1024*1024 {count++} END {print count+0}')
+            
+            echo "  Size distribution:"
+            echo "    Small (<1MB): $small_count files"
+            echo "    Medium (1-10MB): $medium_count files"
+            echo "    Large (>10MB): $large_count files"
+        fi
+    fi
+    
+    # Analyze video sizes
+    if [ -n "$video_sizes" ]; then
+        local video_count=$(echo "$video_sizes" | grep -v "^$" | wc -l)
+        if [ "$video_count" -gt 0 ]; then
+            local total_video_size=$(echo "$video_sizes" | grep -v "^$" | awk '{sum += $1} END {print sum}')
+            local avg_video_size=$(echo "scale=0; $total_video_size / $video_count" | bc 2>/dev/null || echo "0")
+            local avg_video_mb=$(echo "scale=1; $avg_video_size / 1024 / 1024" | bc 2>/dev/null || echo "0")
+            
+            echo ""
+            echo "🎬 Videos: $video_count files"
+            echo "  Total size: $(echo "scale=1; $total_video_size / 1024 / 1024" | bc 2>/dev/null || echo "0") MB"
+            echo "  Average size: ${avg_video_mb} MB"
+            
+            # Size distribution
+            local small_count=$(echo "$video_sizes" | grep -v "^$" | awk '$1 < 50*1024*1024 {count++} END {print count+0}')
+            local medium_count=$(echo "$video_sizes" | grep -v "^$" | awk '$1 >= 50*1024*1024 && $1 < 500*1024*1024 {count++} END {print count+0}')
+            local large_count=$(echo "$video_sizes" | grep -v "^$" | awk '$1 >= 500*1024*1024 {count++} END {print count+0}')
+            
+            echo "  Size distribution:"
+            echo "    Small (<50MB): $small_count files"
+            echo "    Medium (50-500MB): $medium_count files"
+            echo "    Large (>500MB): $large_count files"
+        fi
+    fi
+}
+
+# Detect duplicate files
+detect_duplicates() {
+    local file_hashes="$1"
+    
+    echo ""
+    echo "🔍 DUPLICATE DETECTION"
+    echo "======================"
+    
+    if [ -z "$file_hashes" ]; then
+        echo "No file hash data available"
+        return
+    fi
+    
+    # Find duplicates by hash
+    local duplicate_groups=$(echo "$file_hashes" | grep -v "^$" | awk -F: '
+    {
+        hash = $1
+        file = $2
+        if (hash in hashes) {
+            hashes[hash] = hashes[hash] "\n" file
+            counts[hash]++
+        } else {
+            hashes[hash] = file
+            counts[hash] = 1
+        }
+    }
+    END {
+        for (hash in hashes) {
+            if (counts[hash] > 1) {
+                print "Hash: " hash
+                print hashes[hash]
+                print "---"
+            }
+        }
+    }')
+    
+    if [ -n "$duplicate_groups" ]; then
+        echo "Found duplicate files:"
+        echo "$duplicate_groups"
+    else
+        echo "No duplicate files found"
+    fi
+}
+
+# Analyze resolutions
+analyze_resolutions() {
+    local image_resolutions="$1"
+    local video_resolutions="$2"
+    
+    echo ""
+    echo "📐 RESOLUTION ANALYSIS"
+    echo "======================"
+    
+    # Analyze image resolutions
+    if [ -n "$image_resolutions" ]; then
+        local image_res_count=$(echo "$image_resolutions" | grep -v "^$" | wc -l)
+        if [ "$image_res_count" -gt 0 ]; then
+            echo "📷 Image Resolutions ($image_res_count files):"
+            echo "$image_resolutions" | grep -v "^$" | sort | uniq -c | sort -nr | head -10 | \
+                while read count resolution; do
+                    printf "  %2d: %s\n" "$count" "$resolution"
+                done
+        fi
+    fi
+    
+    # Analyze video resolutions
+    if [ -n "$video_resolutions" ]; then
+        local video_res_count=$(echo "$video_resolutions" | grep -v "^$" | wc -l)
+        if [ "$video_res_count" -gt 0 ]; then
+            echo ""
+            echo "🎬 Video Resolutions ($video_res_count files):"
+            echo "$video_resolutions" | grep -v "^$" | sort | uniq -c | sort -nr | head -10 | \
+                while read count resolution; do
+                    printf "  %2d: %s\n" "$count" "$resolution"
+                done
+        fi
+    fi
+    
+    if [ -z "$image_resolutions" ] && [ -z "$video_resolutions" ]; then
+        echo "No resolution data available"
+    fi
+}
+
+# Analyze aspect ratios
+analyze_aspect_ratios() {
+    local image_aspects="$1"
+    local video_aspects="$2"
+    
+    echo ""
+    echo "📏 ASPECT RATIO ANALYSIS"
+    echo "========================"
+    
+    # Analyze image aspect ratios
+    if [ -n "$image_aspects" ]; then
+        local image_aspect_count=$(echo "$image_aspects" | grep -v "^$" | wc -l)
+        if [ "$image_aspect_count" -gt 0 ]; then
+            echo "📷 Image Aspect Ratios ($image_aspect_count files):"
+            
+            # Categorize aspect ratios
+            local portrait_count=$(echo "$image_aspects" | grep -v "^$" | awk '$1 < 0.8 {count++} END {print count+0}')
+            local square_count=$(echo "$image_aspects" | grep -v "^$" | awk '$1 >= 0.8 && $1 <= 1.2 {count++} END {print count+0}')
+            local landscape_count=$(echo "$image_aspects" | grep -v "^$" | awk '$1 > 1.2 {count++} END {print count+0}')
+            
+            echo "  Portrait (<0.8): $portrait_count files"
+            echo "  Square (0.8-1.2): $square_count files"
+            echo "  Landscape (>1.2): $landscape_count files"
+            
+            # Show most common ratios
+            echo ""
+            echo "  Most common ratios:"
+            echo "$image_aspects" | grep -v "^$" | awk '
+            {
+                ratio = $1
+                if (ratio < 0.8) category = "Portrait"
+                else if (ratio <= 1.2) category = "Square"
+                else category = "Landscape"
+                categories[category]++
+            }
+            END {
+                for (cat in categories) {
+                    printf "    %s: %d files\n", cat, categories[cat]
+                }
+            }'
+        fi
+    fi
+    
+    # Analyze video aspect ratios
+    if [ -n "$video_aspects" ]; then
+        local video_aspect_count=$(echo "$video_aspects" | grep -v "^$" | wc -l)
+        if [ "$video_aspect_count" -gt 0 ]; then
+            echo ""
+            echo "🎬 Video Aspect Ratios ($video_aspect_count files):"
+            
+            # Categorize aspect ratios
+            local portrait_count=$(echo "$video_aspects" | grep -v "^$" | awk '$1 < 0.8 {count++} END {print count+0}')
+            local square_count=$(echo "$video_aspects" | grep -v "^$" | awk '$1 >= 0.8 && $1 <= 1.2 {count++} END {print count+0}')
+            local landscape_count=$(echo "$video_aspects" | grep -v "^$" | awk '$1 > 1.2 {count++} END {print count+0}')
+            
+            echo "  Portrait (<0.8): $portrait_count files"
+            echo "  Square (0.8-1.2): $square_count files"
+            echo "  Landscape (>1.2): $landscape_count files"
+            
+            # Show most common ratios
+            echo ""
+            echo "  Most common ratios:"
+            echo "$video_aspects" | grep -v "^$" | awk '
+            {
+                ratio = $1
+                if (ratio < 0.8) category = "Portrait"
+                else if (ratio <= 1.2) category = "Square"
+                else category = "Landscape"
+                categories[category]++
+            }
+            END {
+                for (cat in categories) {
+                    printf "    %s: %d files\n", cat, categories[cat]
+                }
+            }'
+        fi
+    fi
+    
+    if [ -z "$image_aspects" ] && [ -z "$video_aspects" ]; then
+        echo "No aspect ratio data available"
+    fi
+}
+
 # Main script
 main() {
     # Default values
@@ -410,6 +680,16 @@ main() {
     local all_cameras=""
     local all_formats=""
     
+    # Enhanced statistics variables
+    local image_sizes=""
+    local video_sizes=""
+    local image_resolutions=""
+    local video_resolutions=""
+    local image_aspects=""
+    local video_aspects=""
+    local file_hashes=""
+    local format_sizes=""
+    
     # Only show progress and text output for text format
     if [ "$output_format" = "text" ]; then
         echo "=== COMPREHENSIVE MEDIA REPORT ==="
@@ -536,11 +816,23 @@ main() {
             # Get file size
             total_size=$((total_size + size))
             
+            # Collect format-specific size data
+            format_sizes="$format_sizes$ext:$size"$'\n'
+            
+            # Calculate file hash for duplicate detection
+            local file_hash=$(shasum "$file" 2>/dev/null | cut -d' ' -f1)
+            if [ -n "$file_hash" ]; then
+                file_hashes="$file_hashes$file_hash:$file"$'\n'
+            fi
+            
             # Determine file type and extract metadata
             case "$ext" in
                 jpg|jpeg|png|gif|bmp|tiff|tif|webp|heic|heif)
                     ((images++))
                     all_formats="$all_formats $ext"
+                    
+                    # Collect image size for statistics
+                    image_sizes="$image_sizes$size"$'\n'
                     
                     # Extract metadata from images
                     local metadata=$(exiftool "$file" 2>/dev/null)
@@ -549,6 +841,18 @@ main() {
                     local camera=$(echo "$metadata" | grep -E "(Make|Model)" | head -2)
                     if [ -n "$camera" ]; then
                         all_cameras="$all_cameras $camera"
+                    fi
+                    
+                    # Extract resolution and aspect ratio
+                    local width=$(echo "$metadata" | grep "Image Width" | head -1 | sed 's/.*: //')
+                    local height=$(echo "$metadata" | grep "Image Height" | head -1 | sed 's/.*: //')
+                    if [ -n "$width" ] && [ -n "$height" ]; then
+                        image_resolutions="$image_resolutions${width}x${height}"$'\n'
+                        # Calculate aspect ratio (simplified)
+                        local aspect_ratio=$(echo "scale=2; $width / $height" | bc 2>/dev/null || echo "0")
+                        if [ "$aspect_ratio" != "0" ]; then
+                            image_aspects="$image_aspects$aspect_ratio"$'\n'
+                        fi
                     fi
                     
                     # Collect keywords - be more selective
@@ -561,8 +865,23 @@ main() {
                     ((videos++))
                     all_formats="$all_formats $ext"
                     
+                    # Collect video size for statistics
+                    video_sizes="$video_sizes$size"$'\n'
+                    
                     # Extract metadata from videos
                     local metadata=$(ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null)
+                    
+                    # Extract video resolution and aspect ratio
+                    local width=$(echo "$metadata" | jq -r '.streams[] | select(.codec_type=="video") | .width // empty' 2>/dev/null | head -1)
+                    local height=$(echo "$metadata" | jq -r '.streams[] | select(.codec_type=="video") | .height // empty' 2>/dev/null | head -1)
+                    if [ -n "$width" ] && [ -n "$height" ] && [ "$width" != "null" ] && [ "$height" != "null" ]; then
+                        video_resolutions="$video_resolutions${width}x${height}"$'\n'
+                        # Calculate aspect ratio (simplified)
+                        local aspect_ratio=$(echo "scale=2; $width / $height" | bc 2>/dev/null || echo "0")
+                        if [ "$aspect_ratio" != "0" ]; then
+                            video_aspects="$video_aspects$aspect_ratio"$'\n'
+                        fi
+                    fi
                     
                     # Collect video tags - be more selective
                     local tags=$(echo "$metadata" | jq -r '.format.tags // empty' 2>/dev/null | grep -v -E "(com\.apple\.|com\.adobe\.|handler|encoder|creation_time|duration|bitrate)" 2>/dev/null)
@@ -676,6 +995,15 @@ main() {
         else
             echo "No keywords found in metadata"
         fi
+        
+        echo ""
+        
+        # Enhanced Statistics
+        calculate_format_averages "$format_sizes"
+        analyze_storage_trends "$image_sizes" "$video_sizes"
+        detect_duplicates "$file_hashes"
+        analyze_resolutions "$image_resolutions" "$video_resolutions"
+        analyze_aspect_ratios "$image_aspects" "$video_aspects"
         
         echo ""
         echo "✅ REPORT COMPLETE"

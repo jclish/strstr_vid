@@ -122,4 +122,70 @@ echo "   ./generate_media_report.sh . -f json | jq ."
 echo
 
 echo "Test recursive analysis:"
-echo "   ./generate_media_report.sh ~/Downloads -r -f json | jq '.summary'" 
+echo "   ./generate_media_report.sh ~/Downloads -r -f json | jq '.summary'"
+
+# Enhanced Media Report Examples
+# Demonstrates the new enhanced statistics features
+
+echo "=== ENHANCED MEDIA REPORT EXAMPLES ==="
+echo ""
+
+echo "📊 Example 1: Basic report with enhanced statistics"
+echo "Command: ./generate_media_report.sh /path/to/media --format text"
+echo "Features:"
+echo "  • Average file sizes by format"
+echo "  • Storage usage trends with size distributions"
+echo "  • Duplicate file detection"
+echo "  • Resolution analysis for images and videos"
+echo "  • Aspect ratio analysis (portrait/landscape/square)"
+echo ""
+
+echo "📊 Example 2: Filtered report with statistics"
+echo "Command: ./generate_media_report.sh /path/to/media --images-only --min-size 1MB"
+echo "Features:"
+echo "  • Only images larger than 1MB"
+echo "  • Enhanced statistics for filtered results"
+echo ""
+
+echo "📊 Example 3: Date-filtered report with statistics"
+echo "Command: ./generate_media_report.sh /path/to/media --date-from 2024-01-01 --date-to 2024-12-31"
+echo "Features:"
+echo "  • Files from 2024 only"
+echo "  • Storage trends for specific time period"
+echo ""
+
+echo "📊 Example 4: CSV export with enhanced data"
+echo "Command: ./generate_media_report.sh /path/to/media --format csv"
+echo "Features:"
+echo "  • CSV output with detailed metadata"
+echo "  • Compatible with spreadsheet analysis"
+echo ""
+
+echo "📊 Example 5: JSON export with statistics"
+echo "Command: ./generate_media_report.sh /path/to/media --format json"
+echo "Features:"
+echo "  • JSON output for programmatic analysis"
+echo "  • Structured data format"
+echo ""
+
+echo "🔍 Enhanced Statistics Features:"
+echo "================================"
+echo "• Average file sizes by format (JPEG, PNG, MP4, etc.)"
+echo "• Storage usage trends with size distribution analysis"
+echo "• Duplicate file detection using SHA-1 hashes"
+echo "• Resolution analysis showing most common resolutions"
+echo "• Aspect ratio analysis categorizing portrait/landscape/square"
+echo "• Size distribution breakdowns (small/medium/large files)"
+echo ""
+
+echo "💡 Use Cases:"
+echo "=============="
+echo "• Storage optimization: Identify large files and duplicates"
+echo "• Media organization: Understand resolution and aspect ratio patterns"
+echo "• Capacity planning: Analyze storage usage trends"
+echo "• Quality assessment: Review resolution and format distributions"
+echo "• Archive management: Find duplicate content for cleanup"
+echo ""
+
+echo "✅ Enhanced Statistics Implementation Complete!"
+echo "Version 2.7 - Enhanced Statistics added to generate_media_report.sh" 

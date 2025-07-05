@@ -32,12 +32,12 @@
 
 ### Medium Priority (Nice to have)
 
-#### 📈 Enhanced Statistics
-- [ ] **Average file sizes by format** - Show mean/median file sizes
-- [ ] **Storage usage trends** - Analyze file sizes over time
-- [ ] **Duplicate detection** - Find files with same content hash
-- [ ] **Resolution analysis** - Image/video resolution statistics
-- [ ] **Aspect ratio analysis** - Portrait vs landscape statistics
+#### 📈 Enhanced Statistics ✅ COMPLETED (v2.7)
+- [x] **Average file sizes by format** - Show mean/median file sizes
+- [x] **Storage usage trends** - Analyze file sizes over time
+- [x] **Duplicate detection** - Find files with same content hash
+- [x] **Resolution analysis** - Image/video resolution statistics
+- [x] **Aspect ratio analysis** - Portrait vs landscape statistics
 
 #### 🔍 Advanced Keyword Analysis
 - [ ] **Keyword clustering** - Group similar keywords together
@@ -168,7 +168,7 @@
 1. **Export results** for search_metadata.sh
 2. **File type filtering** for generate_media_report.sh ✅
 3. **Search statistics** for search_metadata.sh
-4. **Enhanced statistics** for generate_media_report.sh
+4. **Enhanced statistics** for generate_media_report.sh ✅
 5. **Date/size filtering** for generate_media_report.sh ✅
 6. **Field-specific search** for search_metadata.sh ✅
 
@@ -190,4 +190,4 @@
 
 ---
 
-*Last updated: Version 2.2 - 2025-07-05* 
+*Last updated: Version 2.7 - 2025-07-04* 
