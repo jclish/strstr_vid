@@ -171,7 +171,7 @@ generate_csv_output() {
     local found_files="$4"
     
     # CSV header
-    echo "File Path,File Type,Search String,Search Field,Match Type,File Size,Last Modified,GPS Latitude,GPS Longitude,Distance (km)"
+    echo "File Path,File Type,Search String,Search Field,Match Type,File Size,Last Modified,GPS Latitude,GPS Longitude,Distance (km),Device Type,Device Model,OS Version"
     
     # CSV data rows
     for result in "${SEARCH_RESULTS_CSV[@]}"; do
@@ -334,6 +334,12 @@ search_image_metadata() {
             gps_lat="${gps_latlon%%|*}"
             gps_lon="${gps_latlon##*|}"
             
+            # Device detection
+            local device_info=""
+            device_info=$(extract_device_info "$file")
+            local make model software device_type device_model os_version
+            IFS='|' read -r make model software device_type device_model os_version <<< "$device_info"
+            
             # Location filtering
             local distance_km=""
             if [ -n "$LOCATION_RADIUS" ]; then
@@ -371,12 +377,13 @@ search_image_metadata() {
                 if [ -n "$distance_km" ]; then
                     json_result="$json_result,\n      \"distance_km\": $distance_km"
                 fi
+                json_result="$json_result,\n      \"device_type\": $(echo "$device_type" | jq -R .),\n      \"device_model\": $(echo "$device_model" | jq -R .),\n      \"os_version\": $(echo "$os_version" | jq -R .)"
                 json_result="$json_result\n    }"
                 SEARCH_RESULTS_JSON+=("$json_result")
             fi
             
             if [ "$CSV_OUTPUT" = true ]; then
-                local csv_result="$(escape_csv "$file"),$(escape_csv "$file_type"),$(escape_csv "$search_string"),$(escape_csv "${SEARCH_FIELD:-""}"),$(escape_csv "metadata"),$(escape_csv "$file_size"),$(escape_csv "$last_modified"),$(escape_csv "$gps_lat"),$(escape_csv "$gps_lon"),$(escape_csv "$distance_km")"
+                local csv_result="$(escape_csv "$file"),$(escape_csv "$file_type"),$(escape_csv "$search_string"),$(escape_csv "${SEARCH_FIELD:-""}"),$(escape_csv "metadata"),$(escape_csv "$file_size"),$(escape_csv "$last_modified"),$(escape_csv "$gps_lat"),$(escape_csv "$gps_lon"),$(escape_csv "$distance_km"),$(escape_csv "$device_type"),$(escape_csv "$device_model"),$(escape_csv "$os_version")"
                 SEARCH_RESULTS_CSV+=("$csv_result")
             fi
         fi
@@ -477,7 +484,7 @@ search_video_metadata() {
             fi
             
             if [ "$CSV_OUTPUT" = true ]; then
-                local csv_result="$(escape_csv "$file"),$(escape_csv "$file_type"),$(escape_csv "$search_string"),$(escape_csv "${SEARCH_FIELD:-""}"),$(escape_csv "metadata"),$(escape_csv "$file_size"),$(escape_csv "$last_modified"),$(escape_csv "$gps_lat"),$(escape_csv "$gps_lon"),$(escape_csv "$distance_km")"
+                local csv_result="$(escape_csv "$file"),$(escape_csv "$file_type"),$(escape_csv "$search_string"),$(escape_csv "${SEARCH_FIELD:-""}"),$(escape_csv "metadata"),$(escape_csv "$file_size"),$(escape_csv "$last_modified"),$(escape_csv "$gps_lat"),$(escape_csv "$gps_lon"),$(escape_csv "$distance_km"),$(escape_csv "$device_type"),$(escape_csv "$device_model"),$(escape_csv "$os_version")"
                 SEARCH_RESULTS_CSV+=("$csv_result")
             fi
         fi
@@ -725,6 +732,59 @@ search_directory() {
     # Return counts for JSON/CSV output
     SEARCH_TOTAL_FILES=$total_files
     SEARCH_FOUND_FILES=$found_files
+}
+
+# Function to extract mobile device information
+extract_device_info() {
+    local file="$1"
+    local make=""
+    local model=""
+    local software=""
+    local device_type=""
+    local device_model=""
+    local os_version=""
+    
+    # Extract basic metadata
+    local metadata=$(exiftool "$file" 2>/dev/null)
+    make=$(echo "$metadata" | awk -F': ' '/^Make/ {print $2}' | head -1)
+    model=$(echo "$metadata" | awk -F': ' '/^Camera Model Name/ {print $2}' | head -1)
+    if [ -z "$model" ]; then
+        model=$(echo "$metadata" | awk -F': ' '/^Model/ {print $2}' | head -1)
+    fi
+    software=$(echo "$metadata" | awk -F': ' '/^Software/ {print $2}' | head -1)
+    
+    # Classify device type
+    if [[ "$make" =~ [Aa]pple ]] || [[ "$model" =~ [Ii]Phone ]]; then
+        device_type="iPhone"
+        device_model=$(echo "$model" | sed 's/iPhone //')
+        os_version=$(echo "$software" | sed 's/iOS //')
+    elif [[ "$make" =~ [Ss]amsung ]] || [[ "$model" =~ [Ss]M- ]] || [[ "$model" =~ [Gg]alaxy ]]; then
+        device_type="Android"
+        device_model=$(echo "$model" | sed 's/SM-//')
+        os_version=$(echo "$software" | sed 's/Android //')
+    elif [[ "$make" =~ [Gg]oogle ]] || [[ "$model" =~ [Pp]ixel ]]; then
+        device_type="Android"
+        device_model="Pixel"
+        os_version=$(echo "$software" | sed 's/Android //')
+    elif [[ "$make" =~ [Xx]iaomi ]] || [[ "$model" =~ [Mm]i ]]; then
+        device_type="Android"
+        device_model="Xiaomi"
+        os_version=$(echo "$software" | sed 's/Android //')
+    elif [[ "$make" =~ [Oo]ne[pP]lus ]] || [[ "$model" =~ [Oo]ne[pP]lus ]]; then
+        device_type="Android"
+        device_model="OnePlus"
+        os_version=$(echo "$software" | sed 's/Android //')
+    elif [[ "$make" =~ [Hh]uawei ]] || [[ "$model" =~ [Hh]uawei ]]; then
+        device_type="Android"
+        device_model="Huawei"
+        os_version=$(echo "$software" | sed 's/Android //')
+    else
+        device_type="Camera"
+        device_model="$model"
+        os_version="$software"
+    fi
+    
+    echo "$make|$model|$software|$device_type|$device_model|$os_version"
 }
 
 # Main script
