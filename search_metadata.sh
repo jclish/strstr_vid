@@ -39,6 +39,11 @@ declare -a SEARCH_RESULTS_CSV
 DEVICE_STATS_TOTAL=0
 DEVICE_STATS_JSON=()
 
+# Advanced search logic arrays
+AND_TERMS=()
+OR_TERMS=()
+NOT_TERMS=()
+
 # Function to print usage
 print_usage() {
     cat << EOF
@@ -65,6 +70,9 @@ Options:
   --bounding-box <min_lat>,<max_lat>,<min_lon>,<max_lon>  Filter by GPS bounding box
   --device-stats         Show device clustering statistics
   --reverse-geocode      Convert GPS coordinates to place names
+  --and <term>           Require all --and terms to match (boolean AND)
+  --or <term>            Match if any --or term matches (boolean OR)
+  --not <term>           Exclude files matching any --not term (boolean NOT)
   -h, --help            Show this help message
 
 Examples:
@@ -306,6 +314,42 @@ is_within_bounding_box() {
     fi
 }
 
+# Function to check if a file's metadata matches advanced search logic
+matches_advanced_search() {
+    local metadata_str="$1"
+    local match=true
+
+    # NOT: Exclude if any NOT term matches
+    for term in "${NOT_TERMS[@]}"; do
+        if echo "$metadata_str" | grep $grep_options -q "$term"; then
+            return 1  # Exclude file
+        fi
+    done
+
+    # AND: Require all AND terms to match
+    for term in "${AND_TERMS[@]}"; do
+        if ! echo "$metadata_str" | grep $grep_options -q "$term"; then
+            return 1  # Exclude file
+        fi
+    done
+
+    # OR: At least one OR term must match (if any provided)
+    if [ ${#OR_TERMS[@]} -gt 0 ]; then
+        local or_matched=false
+        for term in "${OR_TERMS[@]}"; do
+            if echo "$metadata_str" | grep $grep_options -q "$term"; then
+                or_matched=true
+                break
+            fi
+        done
+        if [ "$or_matched" = false ]; then
+            return 1  # Exclude file
+        fi
+    fi
+
+    return 0  # File matches all criteria
+}
+
 # Function to search in image metadata
 search_image_metadata() {
     local file="$1"
@@ -325,8 +369,20 @@ search_image_metadata() {
         grep_options="$grep_options -i"
     fi
     
-    if exiftool "$file" 2>/dev/null | grep $grep_options -q "$search_string"; then
-        found=true
+    # Extract all metadata as a single string
+    local metadata_full="$(exiftool "$file" 2>/dev/null)"
+
+    if [ ${#AND_TERMS[@]} -gt 0 ] || [ ${#OR_TERMS[@]} -gt 0 ] || [ ${#NOT_TERMS[@]} -gt 0 ]; then
+        if matches_advanced_search "$metadata_full"; then
+            found=true
+        fi
+    else
+        if echo "$metadata_full" | grep $grep_options -q "$search_string"; then
+            found=true
+        fi
+    fi
+
+    if [ "$found" = true ]; then
         echo -e "${GREEN}✓ Found in image: $file${NC}"
 
         # Device detection (always run for stats)
@@ -436,8 +492,20 @@ search_video_metadata() {
         grep_options="$grep_options -i"
     fi
     
-    if ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null | grep $grep_options -q "$search_string"; then
-        found=true
+    # Extract all metadata as a single string
+    local metadata_full="$(ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null)"
+
+    if [ ${#AND_TERMS[@]} -gt 0 ] || [ ${#OR_TERMS[@]} -gt 0 ] || [ ${#NOT_TERMS[@]} -gt 0 ]; then
+        if matches_advanced_search "$metadata_full"; then
+            found=true
+        fi
+    else
+        if echo "$metadata_full" | grep $grep_options -q "$search_string"; then
+            found=true
+        fi
+    fi
+
+    if [ "$found" = true ]; then
         echo -e "${GREEN}✓ Found in video: $file${NC}"
 
         # Device detection (always run for stats)
@@ -1024,6 +1092,18 @@ main() {
                 REVERSE_GEOCODE=true
                 shift
                 ;;
+            --and)
+                AND_TERMS+=("$2")
+                shift 2
+                ;;
+            --or)
+                OR_TERMS+=("$2")
+                shift 2
+                ;;
+            --not)
+                NOT_TERMS+=("$2")
+                shift 2
+                ;;
             -h|--help)
                 print_usage
                 exit 0
@@ -1049,8 +1129,8 @@ main() {
     fi
 
     # Check if we have the required arguments
-    if [ -z "$search_string" ] && [ "$SHOW_FIELD_LIST" = false ]; then
-        echo -e "${RED}Error: Missing required search string argument${NC}"
+    if [ -z "$search_string" ] && [ "$SHOW_FIELD_LIST" = false ] && [ ${#AND_TERMS[@]} -eq 0 ] && [ ${#OR_TERMS[@]} -eq 0 ] && [ ${#NOT_TERMS[@]} -eq 0 ]; then
+        echo -e "${RED}Error: Missing required search string or advanced search terms${NC}"
         print_usage
         exit 1
     fi
