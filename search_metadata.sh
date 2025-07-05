@@ -27,11 +27,16 @@ JSON_OUTPUT=false
 CSV_OUTPUT=false
 LOCATION_RADIUS=""
 LOCATION_BOUNDING_BOX=""
+SHOW_DEVICE_STATS=false
 
 # Arrays to store results for JSON/CSV output
 declare -a SEARCH_RESULTS
 declare -a SEARCH_RESULTS_JSON
 declare -a SEARCH_RESULTS_CSV
+
+# Device clustering variables
+DEVICE_STATS_TOTAL=0
+DEVICE_STATS_JSON=()
 
 # Function to print usage
 print_usage() {
@@ -57,6 +62,7 @@ Options:
   --csv                  Export results in CSV format
   --within-radius <lat>,<lon>,<radius_km>  Filter by GPS radius (decimal or DMS)
   --bounding-box <min_lat>,<max_lat>,<min_lon>,<max_lon>  Filter by GPS bounding box
+  --device-stats         Show device clustering statistics
   -h, --help            Show this help message
 
 Examples:
@@ -320,7 +326,15 @@ search_image_metadata() {
     if exiftool "$file" 2>/dev/null | grep $grep_options -q "$search_string"; then
         found=true
         echo -e "${GREEN}✓ Found in image: $file${NC}"
-        
+
+        # Device detection (always run for stats)
+        local device_info=""
+        device_info=$(extract_device_info "$file")
+        local make model software device_type device_model os_version
+        IFS='|' read -r make model software device_type device_model os_version <<< "$device_info"
+        # Collect device statistics
+        collect_device_stats "$device_type" "$device_model" "$os_version"
+
         # Collect data for JSON/CSV output
         if [ "$JSON_OUTPUT" = true ] || [ "$CSV_OUTPUT" = true ]; then
             local file_size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "0")
@@ -333,12 +347,6 @@ search_image_metadata() {
             gps_latlon=$(extract_gps_from_exiftool "$file")
             gps_lat="${gps_latlon%%|*}"
             gps_lon="${gps_latlon##*|}"
-            
-            # Device detection
-            local device_info=""
-            device_info=$(extract_device_info "$file")
-            local make model software device_type device_model os_version
-            IFS='|' read -r make model software device_type device_model os_version <<< "$device_info"
             
             # Location filtering
             local distance_km=""
@@ -423,7 +431,15 @@ search_video_metadata() {
     if ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null | grep $grep_options -q "$search_string"; then
         found=true
         echo -e "${GREEN}✓ Found in video: $file${NC}"
-        
+
+        # Device detection (always run for stats)
+        local device_info=""
+        device_info=$(extract_device_info "$file")
+        local make model software device_type device_model os_version
+        IFS='|' read -r make model software device_type device_model os_version <<< "$device_info"
+        # Collect device statistics
+        collect_device_stats "$device_type" "$device_model" "$os_version"
+
         # Collect data for JSON/CSV output
         if [ "$JSON_OUTPUT" = true ] || [ "$CSV_OUTPUT" = true ]; then
             local file_size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "0")
@@ -441,7 +457,7 @@ search_video_metadata() {
                 gps_lat="${gps_latlon%%|*}"
                 gps_lon="${gps_latlon##*|}"
             fi
-
+            
             # Location filtering
             local distance_km=""
             if [ -n "$LOCATION_RADIUS" ]; then
@@ -479,6 +495,7 @@ search_video_metadata() {
                 if [ -n "$distance_km" ]; then
                     json_result="$json_result,\n      \"distance_km\": $distance_km"
                 fi
+                json_result="$json_result,\n      \"device_type\": $(echo "$device_type" | jq -R .),\n      \"device_model\": $(echo "$device_model" | jq -R .),\n      \"os_version\": $(echo "$os_version" | jq -R .)"
                 json_result="$json_result\n    }"
                 SEARCH_RESULTS_JSON+=("$json_result")
             fi
@@ -787,6 +804,99 @@ extract_device_info() {
     echo "$make|$model|$software|$device_type|$device_model|$os_version"
 }
 
+# Function to collect device statistics
+collect_device_stats() {
+    local device_type="$1"
+    local device_model="$2"
+    local os_version="$3"
+    
+    # Create a unique key for this device combination
+    local device_key="${device_type}|${device_model}|${os_version}"
+    
+    # Store device info in the JSON array for later processing
+    local device_info="{\"type\":\"$device_type\",\"model\":\"$device_model\",\"os\":\"$os_version\",\"key\":\"$device_key\"}"
+    DEVICE_STATS_JSON+=("$device_info")
+    
+    # Increment total count
+    DEVICE_STATS_TOTAL=$((DEVICE_STATS_TOTAL + 1))
+}
+
+# Function to generate device statistics output
+generate_device_stats() {
+    echo -e "${BLUE}Device Statistics:${NC}"
+    echo -e "  Total files with device info: $DEVICE_STATS_TOTAL"
+    echo
+    
+    if [ ${#DEVICE_STATS_JSON[@]} -eq 0 ]; then
+        echo -e "${YELLOW}No device information found in processed files.${NC}"
+        return
+    fi
+    
+    # Process device statistics
+    local device_counts=""
+    for device_info in "${DEVICE_STATS_JSON[@]}"; do
+        local key=$(echo "$device_info" | grep -o '"key":"[^"]*"' | cut -d'"' -f4)
+        device_counts="$device_counts$key"$'\n'
+    done
+    
+    # Count occurrences of each device
+    local unique_devices=$(echo "$device_counts" | sort | uniq -c | sort -nr)
+    
+    echo -e "${CYAN}Device Breakdown:${NC}"
+    local total_count=0
+    
+    while IFS= read -r line; do
+        if [ -n "$line" ]; then
+            local count=$(echo "$line" | awk '{print $1}')
+            local device_key=$(echo "$line" | awk '{print $2}')
+            total_count=$((total_count + count))
+            
+            # Parse device info
+            local device_type device_model os_version
+            IFS='|' read -r device_type device_model os_version <<< "$device_key"
+            
+            # Calculate percentage
+            local percentage=$(echo "scale=1; $count * 100 / $DEVICE_STATS_TOTAL" | bc -l)
+            
+            echo -e "  ${GREEN}$device_type${NC} - ${YELLOW}$device_model${NC} (${CYAN}$os_version${NC}): $count files (${GREEN}${percentage}%${NC})"
+        fi
+    done <<< "$unique_devices"
+    
+    echo
+    echo -e "${CYAN}Summary:${NC}"
+    local unique_count=$(echo "$unique_devices" | wc -l)
+    echo -e "  Unique device combinations: $unique_count"
+    echo -e "  Most common device: $(get_most_common_device)"
+}
+
+# Function to get the most common device
+get_most_common_device() {
+    if [ ${#DEVICE_STATS_JSON[@]} -eq 0 ]; then
+        echo "None"
+        return
+    fi
+    
+    # Process device statistics
+    local device_counts=""
+    for device_info in "${DEVICE_STATS_JSON[@]}"; do
+        local key=$(echo "$device_info" | grep -o '"key":"[^"]*"' | cut -d'"' -f4)
+        device_counts="$device_counts$key"$'\n'
+    done
+    
+    # Get the most common device
+    local most_common=$(echo "$device_counts" | sort | uniq -c | sort -nr | head -1)
+    
+    if [ -n "$most_common" ]; then
+        local count=$(echo "$most_common" | awk '{print $1}')
+        local device_key=$(echo "$most_common" | awk '{print $2}')
+        local device_type device_model os_version
+        IFS='|' read -r device_type device_model os_version <<< "$device_key"
+        echo "$device_type $device_model ($os_version) - $count files"
+    else
+        echo "None"
+    fi
+}
+
 # Main script
 main() {
     # Initialize positional arguments
@@ -845,6 +955,10 @@ main() {
             --bounding-box)
                 LOCATION_BOUNDING_BOX="$2"
                 shift 2
+                ;;
+            --device-stats)
+                SHOW_DEVICE_STATS=true
+                shift
                 ;;
             -h|--help)
                 print_usage
@@ -917,6 +1031,12 @@ main() {
 
     # Perform the search
     search_directory "$directory" "$search_string"
+
+    # Show device statistics if requested
+    if [ "$SHOW_DEVICE_STATS" = true ]; then
+        echo
+        generate_device_stats
+    fi
 
     # Generate format-specific output
     if [ "$JSON_OUTPUT" = true ]; then
