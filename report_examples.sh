@@ -12,6 +12,13 @@ if [ ! -f "./generate_media_report.sh" ]; then
     exit 1
 fi
 
+echo "NEW IN VERSION 2.0:"
+echo "• Progress bar during processing"
+echo "• Keyword analysis for podcast transcript matching"
+echo "• Enhanced metadata filtering"
+echo "• Improved error handling"
+echo
+
 echo "1. Basic media report for current directory:"
 echo "   ./generate_media_report.sh ."
 echo
@@ -57,12 +64,16 @@ echo "📋 Device Analysis:"
 echo "   ./generate_media_report.sh ~/Photos -r -f json | jq '.files[] | select(.type == \"image\") | .metadata' | grep -i 'make\|model'"
 echo
 
+echo "🔍 Keyword Analysis for Podcast Matching:"
+echo "   ./generate_media_report.sh ~/Media -r"
+echo
+
 echo "📅 Timeline Analysis:"
 echo "   ./generate_media_report.sh ~/Media -r -f csv | grep '2024' | wc -l"
 echo
 
 echo "=== Output Formats ==="
-echo "Text: Human-readable summary with statistics"
+echo "Text: Human-readable summary with statistics and keyword analysis"
 echo "JSON: Complete structured data for programmatic analysis"
 echo "CSV: Simple tabular format for spreadsheet import"
 echo
@@ -89,9 +100,11 @@ echo
 
 echo "=== Tips ==="
 echo "- Use -r flag for comprehensive analysis of large directories"
-echo "- Use -v flag to see processing progress"
+echo "- Progress bar shows processing status automatically"
+echo "- Use -v flag to see detailed processing information"
 echo "- Use -d flag to see detailed file information"
 echo "- Combine -j and -c flags to export multiple formats"
 echo "- Use jq for advanced JSON processing and filtering"
 echo "- Use date filters to analyze specific time periods"
-echo "- Use size filters to focus on large files" 
+echo "- Use size filters to focus on large files"
+echo "- Keyword analysis helps match media to podcast content" 
