@@ -15,6 +15,8 @@ A comprehensive suite of shell scripts for analyzing and searching metadata in v
 - **Multiple output formats**: Text, JSON, and CSV reports
 - **Advanced filtering**: Filter by file size, date range, and media type
 - **Statistical analysis**: File counts, size totals, format breakdowns, camera/device analysis
+- **Keyword analysis**: Extracts and analyzes descriptive keywords for podcast transcript matching
+- **Progress tracking**: User-friendly progress bar during processing
 - **Export capabilities**: Export detailed data for further analysis
 
 ## Requirements
@@ -95,6 +97,11 @@ Export both JSON and CSV reports:
 Filter by file size and date range:
 ```bash
 ./generate_media_report.sh ~/Photos -s 1048576 -D 2023-01-01 -T 2024-12-31
+```
+
+Generate comprehensive report with keyword analysis:
+```bash
+./generate_media_report.sh ~/Media
 ```
 
 ### Command Line Options
@@ -191,6 +198,12 @@ Filter by file size and date range:
 - Easy import into spreadsheets
 - Basic file information (path, type, format, size, date)
 
+### Keyword Analysis
+- Extracts descriptive keywords from image and video metadata
+- Filters out technical metadata to focus on content descriptions
+- Provides actionable search terms for podcast transcript matching
+- Shows keyword frequency and common themes
+
 ## Output Examples
 
 ### Metadata Search Results
@@ -209,23 +222,58 @@ Search Summary:
 
 ### Media Report Example
 ```
-=== Media Report for /Users/user/Media ===
+=== COMPREHENSIVE MEDIA REPORT ===
+Directory: /Users/user/Media
+Generated: Fri Jul 4 18:02:16 PDT 2025
 
-📊 SUMMARY:
-  Total files: 1,247
-  Images: 892 (71.5%)
-  Videos: 355 (28.5%)
-  Total size: 45.2 GB
+📊 PROCESSING FILES...
+========================
+Processing: [##################################################] 264/264 files
 
-📷 IMAGES (892 files):
-  Formats: JPG (456), PNG (234), HEIC (202)
-  Cameras: iPhone (234), Canon (189), Nikon (156)
-  Years: 2024 (234), 2023 (456), 2022 (202)
-  
-🎬 VIDEOS (355 files):
-  Formats: MP4 (234), MOV (89), AVI (32)
-  Codecs: H.264 (189), H.265 (89), VP9 (77)
-  Duration: 2.3 hours total
+📋 SUMMARY REPORT
+========================
+Total files: 264
+Images: 68
+Videos: 194
+Other: 2
+Total size: 24262490782 bytes (23138.5 MB)
+
+📷 IMAGE ANALYSIS
+========================
+Image count: 68
+Formats found:
+  62 jpeg
+   5 png
+   1 jpg
+
+Cameras found:
+  18 NIKON
+  16 Canon
+   7 SONY
+
+🎬 VIDEO ANALYSIS
+========================
+Video count: 194
+Formats found:
+ 194 mov
+
+🔍 KEYWORD ANALYSIS
+========================
+📝 KEYWORDS BY FREQUENCY:
+  48: business,
+  44: technology,
+  40: management,
+  40: design,
+  39: concept,
+  39: background,
+
+💡 SUGGESTED SEARCH TERMS FOR PODCAST MATCHING:
+  • business, (48 occurrences)
+  • technology, (44 occurrences)
+  • management, (40 occurrences)
+  • design, (40 occurrences)
+  • concept, (39 occurrences)
+  • background, (39 occurrences)
 ```
 
 ### JSON Report Structure
