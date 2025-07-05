@@ -21,6 +21,7 @@ SHOW_METADATA=false
 USE_REGEX=false
 SEARCH_FIELD=""
 SHOW_FIELD_LIST=false
+OUTPUT_FILE=""
 
 # Function to print usage
 print_usage() {
@@ -41,6 +42,7 @@ Options:
   -R, --regex            Enable regex pattern matching (default: simple string search)
   -f, --field <field>    Search specific metadata field (e.g. Make, Model, Date)
   -l, --field-list       Show available metadata fields for files
+  -o, --output <file>    Save results to file (text format)
   -h, --help            Show this help message
 
 Examples:
@@ -375,6 +377,10 @@ main() {
                 SHOW_FIELD_LIST=true
                 shift
                 ;;
+            -o|--output)
+                OUTPUT_FILE="$2"
+                shift 2
+                ;;
             -h|--help)
                 print_usage
                 exit 0
@@ -436,8 +442,25 @@ main() {
     fi
     echo
 
+    # At the start of main(), after argument parsing and before any output:
+    local temp_output=""
+    if [ -n "$OUTPUT_FILE" ]; then
+        temp_output=$(mktemp)
+        exec 3>&1
+        exec 1>"$temp_output"
+    fi
+
     # Perform the search
     search_directory "$directory" "$search_string"
+
+    # At the end of main(), after all output:
+    if [ -n "$OUTPUT_FILE" ]; then
+        exec 1>&3
+        exec 3>&-
+        cp "$temp_output" "$OUTPUT_FILE"
+        rm "$temp_output"
+        echo -e "${GREEN}Results saved to: $OUTPUT_FILE${NC}"
+    fi
 }
 
 # Run main function with all arguments
