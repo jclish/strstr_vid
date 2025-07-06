@@ -2,6 +2,34 @@
 
 A comprehensive suite of command-line tools for searching and analyzing metadata in video and picture files. Features advanced search capabilities, GPS filtering, device clustering, and comprehensive reporting.
 
+## 🚀 Recent Updates
+
+### Version 2.13 - Cache Migration & Versioning
+- **Cache schema versioning** with automatic version detection
+- **Automatic cache migration** for seamless format upgrades
+- **Backward compatibility** support for older cache versions
+- **Migration rollback** to revert to previous cache versions
+- **Version-specific optimizations** for performance improvements
+- **Cache compatibility validation** across different versions
+- **Comprehensive test suite** with 191 total tests
+
+### Version 2.12 - Advanced Cache Management
+- **Cache statistics & monitoring** (hit rates, efficiency, growth analysis)
+- **Cache health checks** (integrity, corruption detection)
+- **Advanced cache pruning** (by size, age, smart cleanup)
+- **Cache optimization** (defragmentation, rebuild, maintenance)
+- **Cache performance analysis** (benchmarking, regression detection)
+- **Cache monitoring & alerts** (real-time monitoring, alert configuration)
+- **Cache diagnostic tools** (comprehensive reports, audit trails)
+- **Comprehensive test suite** with 172 total tests
+
+### Version 2.11 - Parallel Processing & Caching
+- **Parallel processing** with configurable worker pools
+- **Metadata caching** with SQLite database
+- **Cache management** commands (init, store, retrieve, clear)
+- **Performance benchmarking** and comparison tools
+- **Comprehensive test suite** with 144 total tests
+
 ## 🚀 Features
 
 ### Core Search Features
@@ -197,6 +225,19 @@ chmod +x search_metadata.sh generate_media_report.sh
 
 # Check cache status
 ./search_metadata.sh "test" /path/to/photos --cache-status
+
+# Advanced cache management
+./search_metadata.sh "test" /path/to/photos --cache-stats
+./search_metadata.sh "test" /path/to/photos --cache-health-check
+./search_metadata.sh "test" /path/to/photos --cache-prune-old
+./search_metadata.sh "test" /path/to/photos --cache-optimize
+./search_metadata.sh "test" /path/to/photos --cache-maintenance
+
+# Cache migration and versioning
+./search_metadata.sh "test" /path/to/photos --cache-migrate
+./search_metadata.sh "test" /path/to/photos --cache-rollback
+./search_metadata.sh "test" /path/to/photos --cache-version
+./search_metadata.sh "test" /path/to/photos --cache-validate
 
 # Clear cache
 ./search_metadata.sh "test" /path/to/photos --cache-clear

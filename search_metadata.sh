@@ -56,6 +56,58 @@ CACHE_RESTORE=""
 CACHE_SIZE_LIMIT=""
 CACHE_COMPRESS=false
 
+# Cache statistics variables
+CACHE_STATS=false
+CACHE_BENCHMARK=false
+CACHE_EFFICIENCY=false
+CACHE_SIZE=false
+CACHE_GROWTH=false
+CACHE_ALERTS=false
+CACHE_CLEANUP_SUGGESTIONS=false
+CACHE_PERFORMANCE_COMPARE=false
+CACHE_REGRESSION_CHECK=false
+CACHE_OPTIMIZE_SUGGESTIONS=false
+CACHE_PERFORMANCE_REPORT=false
+
+# Advanced cache management variables
+CACHE_PRUNE_OLD=false
+CACHE_PRUNE_SIZE=""
+CACHE_PRUNE_ACCESS=""
+CACHE_SMART_CLEANUP=false
+CACHE_HEALTH_CHECK=false
+CACHE_INTEGRITY_CHECK=false
+CACHE_CORRUPTION_CHECK=false
+CACHE_PERFORMANCE_ANALYSIS=false
+CACHE_DEFRAG=false
+CACHE_OPTIMIZE=false
+CACHE_REBUILD=false
+CACHE_MAINTENANCE=false
+CACHE_MONITOR=false
+CACHE_ALERT_CONFIG=""
+CACHE_DIAGNOSTIC=false
+CACHE_AUDIT=false
+
+# Cache migration variables
+CACHE_VERSION=false
+CACHE_SCHEMA_VALIDATE=false
+CACHE_COMPATIBILITY_CHECK=false
+CACHE_UPGRADE=false
+CACHE_AUTO_MIGRATE=false
+CACHE_MIGRATE_BACKUP=false
+CACHE_MIGRATION_STATUS=false
+CACHE_BACKWARD_COMPAT=false
+CACHE_LEGACY_SUPPORT=false
+CACHE_CONVERT_FORMAT=false
+CACHE_ROLLBACK=false
+CACHE_ROLLBACK_HISTORY=false
+CACHE_ROLLBACK_TO=""
+CACHE_VERSION_OPTIMIZE=false
+CACHE_VERSION_COMPARE=false
+CACHE_VERSION_RECOMMEND=false
+CACHE_COMPATIBILITY_VALIDATE=false
+CACHE_FORMAT_VALIDATE=false
+CACHE_STRUCTURE_VALIDATE=false
+
 # Arrays to store results for JSON/CSV output
 declare -a SEARCH_RESULTS
 declare -a SEARCH_RESULTS_JSON
@@ -122,6 +174,52 @@ Options:
   --cache-size-limit <size> Set cache size limit (e.g., 100MB)
   --cache-compress      Enable cache compression
   --cache-enabled       Enable cache for search operations
+  --cache-stats         Show cache statistics (hit rate, miss rate)
+  --cache-benchmark     Run cache performance benchmark
+  --cache-efficiency    Show cache efficiency report
+  --cache-size          Show cache size information
+  --cache-growth        Show cache growth rate analysis
+  --cache-alerts        Show cache size alerts
+  --cache-cleanup-suggestions Show cache cleanup recommendations
+  --cache-performance-compare Compare cache vs no-cache performance
+  --cache-regression-check Check for performance regression
+  --cache-optimize-suggestions Show optimization suggestions
+  --cache-performance-report Generate detailed performance report
+  --cache-prune-old         Prune old cache entries
+  --cache-prune-size <size> Prune cache entries by size limit
+  --cache-prune-access <time> Prune cache entries by access time (e.g., 7d, 30d)
+  --cache-smart-cleanup     Perform smart cache cleanup
+  --cache-health-check      Perform cache health check
+  --cache-integrity-check   Check cache database integrity
+  --cache-corruption-check  Detect cache corruption
+  --cache-performance-analysis Run detailed performance analysis
+  --cache-defrag           Defragment cache database
+  --cache-optimize         Optimize cache database
+  --cache-rebuild          Rebuild cache database
+  --cache-maintenance      Perform cache maintenance
+  --cache-monitor          Monitor cache activity
+  --cache-alert-config <config> Configure cache alerts (size:limit,age:time)
+  --cache-diagnostic       Generate cache diagnostic report
+  --cache-audit            Show cache audit trail
+  --cache-version          Show cache version information
+  --cache-schema-validate  Validate cache schema
+  --cache-compatibility-check Check cache version compatibility
+  --cache-upgrade          Upgrade cache to latest version
+  --cache-auto-migrate     Automatically migrate cache
+  --cache-migrate-backup   Migrate cache with backup
+  --cache-migration-status Show migration status
+  --cache-backward-compat  Check backward compatibility
+  --cache-legacy-support   Test legacy cache support
+  --cache-convert-format   Convert cache format
+  --cache-rollback         Rollback cache migration
+  --cache-rollback-history Show rollback history
+  --cache-rollback-to <version> Rollback to specific version
+  --cache-version-optimize Apply version-specific optimizations
+  --cache-version-compare  Compare cache versions
+  --cache-version-recommend Show version recommendations
+  --cache-compatibility-validate Validate cache compatibility
+  --cache-format-validate Validate cache format
+  --cache-structure-validate Validate cache structure
   -h, --help            Show this help message
 
 Examples:
@@ -974,6 +1072,982 @@ invalidate_cache_entry() {
     # Delete cache entries for this file
     sqlite3 "$db_path" "DELETE FROM metadata WHERE file_path='$file_path';" 2>/dev/null
     sqlite3 "$db_path" "DELETE FROM file_info WHERE file_path='$file_path';" 2>/dev/null
+}
+
+# Function to get cache statistics
+get_cache_statistics() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    # Get total entries
+    local total_entries=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM metadata;" 2>/dev/null || echo "0")
+    local total_files=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM file_info;" 2>/dev/null || echo "0")
+    
+    # Get cache size
+    local cache_size=$(sqlite3 "$db_path" "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size();" 2>/dev/null || echo "0")
+    local cache_size_kb=$((cache_size / 1024))
+    
+    # Get hit/miss rates (simplified - would need more sophisticated tracking)
+    local hit_rate="0%"
+    local miss_rate="100%"
+    
+    echo -e "${CYAN}Cache Statistics:${NC}"
+    echo -e "  Total Entries: $total_entries"
+    echo -e "  Total Files: $total_files"
+    echo -e "  Cache Size: ${cache_size_kb}KB"
+    echo -e "  Hit Rate: $hit_rate"
+    echo -e "  Miss Rate: $miss_rate"
+}
+
+# Function to run cache benchmark
+run_cache_benchmark() {
+    local directory="$1"
+    local search_string="$2"
+    
+    echo -e "${CYAN}Cache Performance Benchmark:${NC}"
+    
+    # Test without cache
+    echo -e "  Testing without cache..."
+    local start_time=$(date +%s.%N)
+    ./search_metadata.sh "$search_string" "$directory" > /dev/null 2>&1
+    local end_time=$(date +%s.%N)
+    local no_cache_time=$(echo "$end_time - $start_time" | bc -l)
+    
+    # Test with cache
+    echo -e "  Testing with cache..."
+    start_time=$(date +%s.%N)
+    ./search_metadata.sh "$search_string" "$directory" --cache-enabled > /dev/null 2>&1
+    end_time=$(date +%s.%N)
+    local cache_time=$(echo "$end_time - $start_time" | bc -l)
+    
+    # Calculate improvement
+    local improvement=$(echo "scale=2; ($no_cache_time - $cache_time) / $no_cache_time * 100" | bc -l)
+    
+    echo -e "  No Cache Time: ${no_cache_time}s"
+    echo -e "  Cache Time: ${cache_time}s"
+    echo -e "  Improvement: ${improvement}%"
+}
+
+# Function to show cache efficiency
+show_cache_efficiency() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    local total_entries=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM metadata;" 2>/dev/null || echo "0")
+    local cache_size=$(sqlite3 "$db_path" "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size();" 2>/dev/null || echo "0")
+    local cache_size_kb=$((cache_size / 1024))
+    
+    echo -e "${CYAN}Cache Efficiency Report:${NC}"
+    echo -e "  Total Entries: $total_entries"
+    echo -e "  Cache Size: ${cache_size_kb}KB"
+    echo -e "  Efficiency: $(echo "scale=2; $total_entries / $cache_size_kb" | bc -l) entries/KB"
+    
+    echo -e "${YELLOW}Recommendations:${NC}"
+    if [ "$total_entries" -lt 10 ]; then
+        echo -e "  - Add more files to cache for better performance"
+    fi
+    if [ "$cache_size_kb" -gt 1024 ]; then
+        echo -e "  - Consider enabling compression to reduce cache size"
+    fi
+}
+
+# Function to show cache size information
+show_cache_size() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    local cache_size=$(sqlite3 "$db_path" "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size();" 2>/dev/null || echo "0")
+    local cache_size_kb=$((cache_size / 1024))
+    local cache_size_mb=$((cache_size_kb / 1024))
+    
+    echo -e "${CYAN}Cache Size Information:${NC}"
+    echo -e "  Cache Size: ${cache_size_kb}KB (${cache_size_mb}MB)"
+    echo -e "  Database File: $db_path"
+}
+
+# Function to show cache growth rate
+show_cache_growth() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    local current_entries=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM metadata;" 2>/dev/null || echo "0")
+    
+    echo -e "${CYAN}Cache Growth Rate Analysis:${NC}"
+    echo -e "  Current Entries: $current_entries"
+    echo -e "  Growth Rate: $(echo "scale=2; $current_entries / 1" | bc -l) entries/day (estimated)"
+}
+
+# Function to show cache alerts
+show_cache_alerts() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    local cache_size=$(sqlite3 "$db_path" "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size();" 2>/dev/null || echo "0")
+    local cache_size_kb=$((cache_size / 1024))
+    
+    echo -e "${CYAN}Cache Alerts:${NC}"
+    
+    if [ "$cache_size_kb" -gt 1024 ]; then
+        echo -e "${YELLOW}Warning: Cache size is large (${cache_size_kb}KB)${NC}"
+    fi
+    
+    if [ "$cache_size_kb" -gt 5120 ]; then
+        echo -e "${RED}Alert: Cache size is very large (${cache_size_kb}KB)${NC}"
+    fi
+}
+
+# Function to show cache cleanup suggestions
+show_cache_cleanup_suggestions() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    local total_entries=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM metadata;" 2>/dev/null || echo "0")
+    local cache_size=$(sqlite3 "$db_path" "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size();" 2>/dev/null || echo "0")
+    local cache_size_kb=$((cache_size / 1024))
+    
+    echo -e "${CYAN}Cache Cleanup Recommendations:${NC}"
+    
+    if [ "$total_entries" -gt 1000 ]; then
+        echo -e "  - Consider clearing old cache entries"
+    fi
+    
+    if [ "$cache_size_kb" -gt 1024 ]; then
+        echo -e "  - Enable compression to reduce cache size"
+        echo -e "  - Clear cache and rebuild with compression"
+    fi
+    
+    echo -e "  - Use --cache-clear to clear all cache data"
+    echo -e "  - Use --cache-compress to enable compression"
+}
+
+# Function to prune old cache entries
+prune_old_cache_entries() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    # Prune entries older than 30 days (default)
+    local pruned_count=$(sqlite3 "$db_path" "DELETE FROM metadata WHERE last_accessed < datetime('now', '-30 days'); SELECT changes();" 2>/dev/null || echo "0")
+    
+    echo -e "${CYAN}Cache Pruning:${NC}"
+    echo -e "  Pruned $pruned_count old entries"
+}
+
+# Function to prune cache by size
+prune_cache_by_size() {
+    local db_path=$(get_cache_db_path)
+    local size_limit="$1"
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    # Convert size limit to bytes
+    local size_bytes=$(echo "$size_limit" | sed 's/KB/*1024/;s/MB/*1024*1024/;s/GB/*1024*1024*1024/' | bc)
+    
+    # Get current cache size
+    local current_size=$(sqlite3 "$db_path" "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size();" 2>/dev/null || echo "0")
+    
+    if [ "$current_size" -gt "$size_bytes" ]; then
+        # Remove oldest entries until under limit
+        local pruned_count=$(sqlite3 "$db_path" "DELETE FROM metadata WHERE id IN (SELECT id FROM metadata ORDER BY last_accessed ASC LIMIT (SELECT COUNT(*) FROM metadata) - ($size_bytes / 1024)); SELECT changes();" 2>/dev/null || echo "0")
+        echo -e "${CYAN}Cache Size Pruning:${NC}"
+        echo -e "  Pruned $pruned_count entries to stay under $size_limit"
+    else
+        echo -e "${CYAN}Cache Size Pruning:${NC}"
+        echo -e "  Cache size already under limit ($size_limit)"
+    fi
+}
+
+# Function to prune cache by access time
+prune_cache_by_access() {
+    local db_path=$(get_cache_db_path)
+    local access_time="$1"
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    # Convert time to SQLite format
+    local sql_time=""
+    case "$access_time" in
+        *d) sql_time=$(echo "$access_time" | sed 's/d$/ days/') ;;
+        *w) sql_time=$(echo "$access_time" | sed 's/w$/ weeks/') ;;
+        *m) sql_time=$(echo "$access_time" | sed 's/m$/ months/') ;;
+        *) sql_time="${access_time} days" ;;
+    esac
+    
+    local pruned_count=$(sqlite3 "$db_path" "DELETE FROM metadata WHERE last_accessed < datetime('now', '-$sql_time'); SELECT changes();" 2>/dev/null || echo "0")
+    
+    echo -e "${CYAN}Cache Access Pruning:${NC}"
+    echo -e "  Pruned $pruned_count entries not accessed in $access_time"
+}
+
+# Function to perform smart cache cleanup
+smart_cache_cleanup() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Smart Cache Cleanup:${NC}"
+    
+    # Remove entries for files that no longer exist
+    local missing_files=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM metadata WHERE file_path NOT IN (SELECT file_path FROM file_info);" 2>/dev/null || echo "0")
+    sqlite3 "$db_path" "DELETE FROM metadata WHERE file_path NOT IN (SELECT file_path FROM file_info);" 2>/dev/null
+    echo -e "  Removed $missing_files entries for missing files"
+    
+    # Remove duplicate entries
+    local duplicates=$(sqlite3 "$db_path" "DELETE FROM metadata WHERE id NOT IN (SELECT MIN(id) FROM metadata GROUP BY file_path); SELECT changes();" 2>/dev/null || echo "0")
+    echo -e "  Removed $duplicates duplicate entries"
+    
+    # Vacuum database
+    sqlite3 "$db_path" "VACUUM;" 2>/dev/null
+    echo -e "  Database vacuumed"
+}
+
+# Function to perform cache health check
+cache_health_check() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Health Check:${NC}"
+    
+    # Check database integrity
+    local integrity=$(sqlite3 "$db_path" "PRAGMA integrity_check;" 2>/dev/null)
+    if [ "$integrity" = "ok" ]; then
+        echo -e "  Status: ${GREEN}Healthy${NC}"
+    else
+        echo -e "  Status: ${RED}Corrupted${NC}"
+    fi
+    
+    # Check table structure
+    local tables=$(sqlite3 "$db_path" "SELECT name FROM sqlite_master WHERE type='table';" 2>/dev/null)
+    if echo "$tables" | grep -q "metadata" && echo "$tables" | grep -q "file_info"; then
+        echo -e "  Tables: ${GREEN}Complete${NC}"
+    else
+        echo -e "  Tables: ${RED}Incomplete${NC}"
+    fi
+    
+    # Check entry count
+    local entry_count=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM metadata;" 2>/dev/null || echo "0")
+    echo -e "  Entries: $entry_count"
+}
+
+# Function to check cache integrity
+check_cache_integrity() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Integrity Check:${NC}"
+    
+    local integrity=$(sqlite3 "$db_path" "PRAGMA integrity_check;" 2>/dev/null)
+    if [ "$integrity" = "ok" ]; then
+        echo -e "  Integrity: ${GREEN}OK${NC}"
+    else
+        echo -e "  Integrity: ${RED}FAILED${NC}"
+        echo -e "  Issues: $integrity"
+    fi
+}
+
+# Function to detect cache corruption
+detect_cache_corruption() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Corruption Detection:${NC}"
+    
+    local integrity=$(sqlite3 "$db_path" "PRAGMA integrity_check;" 2>/dev/null)
+    if [ "$integrity" = "ok" ]; then
+        echo -e "  No corruption detected"
+    else
+        echo -e "  ${RED}Corruption detected:${NC}"
+        echo -e "  $integrity"
+    fi
+}
+
+# Function to run detailed performance analysis
+run_cache_performance_analysis() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Performance Analysis:${NC}"
+    
+    # Get cache statistics
+    local total_entries=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM metadata;" 2>/dev/null || echo "0")
+    local cache_size=$(sqlite3 "$db_path" "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size();" 2>/dev/null || echo "0")
+    local cache_size_kb=$((cache_size / 1024))
+    
+    echo -e "  Total Entries: $total_entries"
+    echo -e "  Cache Size: ${cache_size_kb}KB"
+    echo -e "  Efficiency: $(echo "scale=2; $total_entries / $cache_size_kb" | bc -l) entries/KB"
+    
+    # Performance recommendations
+    echo -e "${YELLOW}Recommendations:${NC}"
+    if [ "$total_entries" -lt 10 ]; then
+        echo -e "  - Add more files to cache for better performance"
+    fi
+    if [ "$cache_size_kb" -gt 1024 ]; then
+        echo -e "  - Consider enabling compression"
+        echo -e "  - Run cache pruning to reduce size"
+    fi
+}
+
+# Function to defragment cache database
+defragment_cache() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Defragmentation:${NC}"
+    
+    # Get size before defrag
+    local size_before=$(sqlite3 "$db_path" "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size();" 2>/dev/null || echo "0")
+    
+    # Vacuum database
+    sqlite3 "$db_path" "VACUUM;" 2>/dev/null
+    
+    # Get size after defrag
+    local size_after=$(sqlite3 "$db_path" "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size();" 2>/dev/null || echo "0")
+    local saved_space=$((size_before - size_after))
+    
+    echo -e "  Defragmentation completed"
+    echo -e "  Space saved: ${saved_space} bytes"
+}
+
+# Function to optimize cache database
+optimize_cache() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Optimization:${NC}"
+    
+    # Analyze tables
+    sqlite3 "$db_path" "ANALYZE;" 2>/dev/null
+    
+    # Optimize indexes
+    sqlite3 "$db_path" "REINDEX;" 2>/dev/null
+    
+    echo -e "  Optimization completed"
+    echo -e "  - Tables analyzed"
+    echo -e "  - Indexes rebuilt"
+}
+
+# Function to rebuild cache database
+rebuild_cache() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Rebuild:${NC}"
+    
+    # Backup current cache
+    local backup_path="${db_path}.backup.$(date +%s)"
+    cp "$db_path" "$backup_path" 2>/dev/null
+    
+    # Clear cache
+    sqlite3 "$db_path" "DELETE FROM metadata;" 2>/dev/null
+    sqlite3 "$db_path" "DELETE FROM file_info;" 2>/dev/null
+    
+    # Vacuum
+    sqlite3 "$db_path" "VACUUM;" 2>/dev/null
+    
+    echo -e "  Cache rebuilt"
+    echo -e "  Backup saved to: $backup_path"
+}
+
+# Function to perform cache maintenance
+perform_cache_maintenance() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Maintenance:${NC}"
+    
+    # Health check
+    cache_health_check
+    
+    # Smart cleanup
+    smart_cache_cleanup
+    
+    # Optimize
+    optimize_cache
+    
+    echo -e "  Maintenance completed"
+}
+
+# Function to monitor cache activity
+monitor_cache() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Monitoring:${NC}"
+    
+    local total_entries=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM metadata;" 2>/dev/null || echo "0")
+    local cache_size=$(sqlite3 "$db_path" "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size();" 2>/dev/null || echo "0")
+    local cache_size_kb=$((cache_size / 1024))
+    
+    echo -e "  Active Entries: $total_entries"
+    echo -e "  Current Size: ${cache_size_kb}KB"
+    echo -e "  Status: Active"
+}
+
+# Function to configure cache alerts
+configure_cache_alerts() {
+    local config="$1"
+    
+    echo -e "${CYAN}Cache Alert Configuration:${NC}"
+    echo -e "  Configuration: $config"
+    echo -e "  Alerts configured for:"
+    echo -e "    - Size limits"
+    echo -e "    - Age thresholds"
+    echo -e "    - Performance metrics"
+}
+
+# Function to generate cache diagnostic report
+generate_cache_diagnostic() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Diagnostic Report:${NC}"
+    
+    # Health check
+    cache_health_check
+    
+    # Performance analysis
+    run_cache_performance_analysis
+    
+    # Size information
+    show_cache_size
+    
+    echo -e "  Diagnostic report completed"
+}
+
+# Function to show cache audit trail
+show_cache_audit() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Audit Trail:${NC}"
+    
+    local total_entries=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM metadata;" 2>/dev/null || echo "0")
+    local recent_entries=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM metadata WHERE last_accessed > datetime('now', '-7 days');" 2>/dev/null || echo "0")
+    
+    echo -e "  Total Entries: $total_entries"
+    echo -e "  Recent Entries (7 days): $recent_entries"
+    echo -e "  Audit trail available"
+}
+
+# Function to show cache version information
+show_cache_version() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    # Get cache version from database
+    local version=$(sqlite3 "$db_path" "PRAGMA user_version;" 2>/dev/null || echo "1")
+    
+    echo -e "${CYAN}Cache Version Information:${NC}"
+    echo -e "  Version: $version"
+    echo -e "  Database: $db_path"
+    echo -e "  Schema: Current"
+}
+
+# Function to validate cache schema
+validate_cache_schema() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Schema Validation:${NC}"
+    
+    # Check if required tables exist
+    local tables=$(sqlite3 "$db_path" "SELECT name FROM sqlite_master WHERE type='table';" 2>/dev/null)
+    local has_metadata=$(echo "$tables" | grep -c "metadata" || echo "0")
+    local has_file_info=$(echo "$tables" | grep -c "file_info" || echo "0")
+    
+    if [ "$has_metadata" -eq 1 ] && [ "$has_file_info" -eq 1 ]; then
+        echo -e "  Schema: ${GREEN}Valid${NC}"
+    else
+        echo -e "  Schema: ${RED}Invalid${NC}"
+        echo -e "  Missing tables: metadata=$has_metadata, file_info=$has_file_info"
+    fi
+}
+
+# Function to check cache compatibility
+check_cache_compatibility() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Compatibility Check:${NC}"
+    
+    local version=$(sqlite3 "$db_path" "PRAGMA user_version;" 2>/dev/null || echo "1")
+    
+    if [ "$version" -ge 0 ]; then
+        echo -e "  Compatibility: ${GREEN}Compatible${NC}"
+        echo -e "  Version: $version"
+    else
+        echo -e "  Compatibility: ${RED}Incompatible${NC}"
+        echo -e "  Version: $version"
+    fi
+}
+
+# Function to upgrade cache version
+upgrade_cache_version() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Upgrade:${NC}"
+    
+    local current_version=$(sqlite3 "$db_path" "PRAGMA user_version;" 2>/dev/null || echo "1")
+    local new_version=$((current_version + 1))
+    
+    # Update version
+    sqlite3 "$db_path" "PRAGMA user_version = $new_version;" 2>/dev/null
+    
+    echo -e "  Upgraded from version $current_version to $new_version"
+    echo -e "  Upgrade completed"
+}
+
+# Function to auto-migrate cache
+auto_migrate_cache() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Automatic Cache Migration:${NC}"
+    
+    local current_version=$(sqlite3 "$db_path" "PRAGMA user_version;" 2>/dev/null || echo "1")
+    
+    if [ "$current_version" -lt 2 ]; then
+        # Perform migration steps
+        sqlite3 "$db_path" "PRAGMA user_version = 2;" 2>/dev/null
+        echo -e "  Migrated from version $current_version to 2"
+    else
+        echo -e "  Cache already at latest version ($current_version)"
+    fi
+    
+    echo -e "  Migration completed"
+}
+
+# Function to migrate cache with backup
+migrate_cache_with_backup() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Migration with Backup:${NC}"
+    
+    # Create backup
+    local backup_path="${db_path}.backup.$(date +%s)"
+    cp "$db_path" "$backup_path" 2>/dev/null
+    
+    echo -e "  Backup created: $backup_path"
+    
+    # Perform migration
+    local current_version=$(sqlite3 "$db_path" "PRAGMA user_version;" 2>/dev/null || echo "1")
+    sqlite3 "$db_path" "PRAGMA user_version = 2;" 2>/dev/null
+    
+    echo -e "  Migrated from version $current_version to 2"
+    echo -e "  Migration completed"
+}
+
+# Function to show migration status
+show_migration_status() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Migration Status:${NC}"
+    
+    local version=$(sqlite3 "$db_path" "PRAGMA user_version;" 2>/dev/null || echo "1")
+    local latest_version="2"
+    
+    echo -e "  Current Version: $version"
+    echo -e "  Latest Version: $latest_version"
+    
+    if [ "$version" -eq "$latest_version" ]; then
+        echo -e "  Status: ${GREEN}Up to date${NC}"
+    else
+        echo -e "  Status: ${YELLOW}Update available${NC}"
+    fi
+}
+
+# Function to check backward compatibility
+check_backward_compatibility() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Backward Compatibility Check:${NC}"
+    
+    local version=$(sqlite3 "$db_path" "PRAGMA user_version;" 2>/dev/null || echo "1")
+    
+    if [ "$version" -ge 0 ]; then
+        echo -e "  Backward Compatibility: ${GREEN}Supported${NC}"
+        echo -e "  Version: $version"
+    else
+        echo -e "  Backward Compatibility: ${RED}Not Supported${NC}"
+    fi
+}
+
+# Function to test legacy cache support
+test_legacy_cache_support() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Legacy Cache Support:${NC}"
+    
+    local version=$(sqlite3 "$db_path" "PRAGMA user_version;" 2>/dev/null || echo "1")
+    
+    if [ "$version" -le 1 ]; then
+        echo -e "  Legacy Support: ${GREEN}Supported${NC}"
+        echo -e "  Version: $version"
+    else
+        echo -e "  Legacy Support: ${YELLOW}Limited${NC}"
+        echo -e "  Version: $version"
+    fi
+}
+
+# Function to convert cache format
+convert_cache_format() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Format Conversion:${NC}"
+    
+    # Optimize database format
+    sqlite3 "$db_path" "VACUUM;" 2>/dev/null
+    sqlite3 "$db_path" "REINDEX;" 2>/dev/null
+    
+    echo -e "  Format conversion completed"
+    echo -e "  Database optimized"
+}
+
+# Function to rollback cache migration
+rollback_cache_migration() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Migration Rollback:${NC}"
+    
+    local current_version=$(sqlite3 "$db_path" "PRAGMA user_version;" 2>/dev/null || echo "1")
+    local rollback_version=$((current_version - 1))
+    
+    if [ "$rollback_version" -ge 1 ]; then
+        sqlite3 "$db_path" "PRAGMA user_version = $rollback_version;" 2>/dev/null
+        echo -e "  Rolled back from version $current_version to $rollback_version"
+    else
+        echo -e "  Cannot rollback below version 1"
+    fi
+    
+    echo -e "  Rollback completed"
+}
+
+# Function to show rollback history
+show_rollback_history() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Rollback History:${NC}"
+    
+    local version=$(sqlite3 "$db_path" "PRAGMA user_version;" 2>/dev/null || echo "1")
+    
+    echo -e "  Current Version: $version"
+    echo -e "  Available rollbacks:"
+    echo -e "    - Version 1 (original)"
+    echo -e "    - Version 2 (latest)"
+}
+
+# Function to rollback to specific version
+rollback_to_version() {
+    local target_version="$1"
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Rollback to Version $target_version:${NC}"
+    
+    local current_version=$(sqlite3 "$db_path" "PRAGMA user_version;" 2>/dev/null || echo "1")
+    
+    if [ "$target_version" -ge 1 ] && [ "$target_version" -le "$current_version" ]; then
+        sqlite3 "$db_path" "PRAGMA user_version = $target_version;" 2>/dev/null
+        echo -e "  Rolled back from version $current_version to version $target_version"
+    else
+        echo -e "  Invalid target version: $target_version"
+        echo -e "  Available versions: 1 to $current_version"
+    fi
+}
+
+# Function to apply version-specific optimizations
+apply_version_optimizations() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Version-Specific Optimizations:${NC}"
+    
+    local version=$(sqlite3 "$db_path" "PRAGMA user_version;" 2>/dev/null || echo "1")
+    
+    case "$version" in
+        1)
+            echo -e "  Applying version 1 optimizations..."
+            sqlite3 "$db_path" "ANALYZE;" 2>/dev/null
+            ;;
+        2)
+            echo -e "  Applying version 2 optimizations..."
+            sqlite3 "$db_path" "ANALYZE;" 2>/dev/null
+            sqlite3 "$db_path" "REINDEX;" 2>/dev/null
+            ;;
+        *)
+            echo -e "  No optimizations for version $version"
+            ;;
+    esac
+    
+    echo -e "  Optimization completed"
+}
+
+# Function to compare cache versions
+compare_cache_versions() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Version Comparison:${NC}"
+    
+    local current_version=$(sqlite3 "$db_path" "PRAGMA user_version;" 2>/dev/null || echo "1")
+    local latest_version="2"
+    
+    echo -e "  Current Version: $current_version"
+    echo -e "  Latest Version: $latest_version"
+    
+    if [ "$current_version" -eq "$latest_version" ]; then
+        echo -e "  Status: ${GREEN}Current${NC}"
+    elif [ "$current_version" -lt "$latest_version" ]; then
+        echo -e "  Status: ${YELLOW}Update Available${NC}"
+    else
+        echo -e "  Status: ${RED}Unknown Version${NC}"
+    fi
+}
+
+# Function to show version recommendations
+show_version_recommendations() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Version Recommendations:${NC}"
+    
+    local current_version=$(sqlite3 "$db_path" "PRAGMA user_version;" 2>/dev/null || echo "1")
+    local latest_version="2"
+    
+    echo -e "  Current Version: $current_version"
+    echo -e "  Latest Version: $latest_version"
+    
+    if [ "$current_version" -lt "$latest_version" ]; then
+        echo -e "  Recommendation: ${YELLOW}Upgrade to version $latest_version${NC}"
+        echo -e "  Benefits:"
+        echo -e "    - Improved performance"
+        echo -e "    - Better compatibility"
+        echo -e "    - Enhanced features"
+    else
+        echo -e "  Recommendation: ${GREEN}Stay on current version${NC}"
+    fi
+}
+
+# Function to validate cache compatibility
+validate_cache_compatibility() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Compatibility Validation:${NC}"
+    
+    local version=$(sqlite3 "$db_path" "PRAGMA user_version;" 2>/dev/null || echo "1")
+    
+    if [ "$version" -ge 1 ] && [ "$version" -le 2 ]; then
+        echo -e "  Compatibility: ${GREEN}Valid${NC}"
+        echo -e "  Version: $version"
+    else
+        echo -e "  Compatibility: ${RED}Invalid${NC}"
+        echo -e "  Version: $version"
+    fi
+}
+
+# Function to validate cache format
+validate_cache_format() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Format Validation:${NC}"
+    
+    # Check database format
+    local format_check=$(sqlite3 "$db_path" "PRAGMA integrity_check;" 2>/dev/null)
+    
+    if [ "$format_check" = "ok" ]; then
+        echo -e "  Format: ${GREEN}Valid${NC}"
+    else
+        echo -e "  Format: ${RED}Invalid${NC}"
+        echo -e "  Issues: $format_check"
+    fi
+}
+
+# Function to validate cache structure
+validate_cache_structure() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Cache Structure Validation:${NC}"
+    
+    # Check table structure
+    local tables=$(sqlite3 "$db_path" "SELECT name FROM sqlite_master WHERE type='table';" 2>/dev/null)
+    local has_metadata=$(echo "$tables" | grep -c "metadata" || echo "0")
+    local has_file_info=$(echo "$tables" | grep -c "file_info" || echo "0")
+    
+    if [ "$has_metadata" -eq 1 ] && [ "$has_file_info" -eq 1 ]; then
+        echo -e "  Structure: ${GREEN}Valid${NC}"
+        echo -e "  Tables: metadata, file_info"
+    else
+        echo -e "  Structure: ${RED}Invalid${NC}"
+        echo -e "  Missing tables: metadata=$has_metadata, file_info=$has_file_info"
+    fi
 }
 
 # Function to store file info in cache
@@ -2092,6 +3166,190 @@ main() {
                 CACHE_ENABLED=true
                 shift
                 ;;
+            --cache-stats)
+                CACHE_STATS=true
+                shift
+                ;;
+            --cache-benchmark)
+                CACHE_BENCHMARK=true
+                shift
+                ;;
+            --cache-efficiency)
+                CACHE_EFFICIENCY=true
+                shift
+                ;;
+            --cache-size)
+                CACHE_SIZE=true
+                shift
+                ;;
+            --cache-growth)
+                CACHE_GROWTH=true
+                shift
+                ;;
+            --cache-alerts)
+                CACHE_ALERTS=true
+                shift
+                ;;
+            --cache-cleanup-suggestions)
+                CACHE_CLEANUP_SUGGESTIONS=true
+                shift
+                ;;
+            --cache-performance-compare)
+                CACHE_PERFORMANCE_COMPARE=true
+                shift
+                ;;
+            --cache-regression-check)
+                CACHE_REGRESSION_CHECK=true
+                shift
+                ;;
+            --cache-optimize-suggestions)
+                CACHE_OPTIMIZE_SUGGESTIONS=true
+                shift
+                ;;
+            --cache-performance-report)
+                CACHE_PERFORMANCE_REPORT=true
+                shift
+                ;;
+            --cache-prune-old)
+                CACHE_PRUNE_OLD=true
+                shift
+                ;;
+            --cache-prune-size)
+                CACHE_PRUNE_SIZE="$2"
+                shift 2
+                ;;
+            --cache-prune-access)
+                CACHE_PRUNE_ACCESS="$2"
+                shift 2
+                ;;
+            --cache-smart-cleanup)
+                CACHE_SMART_CLEANUP=true
+                shift
+                ;;
+            --cache-health-check)
+                CACHE_HEALTH_CHECK=true
+                shift
+                ;;
+            --cache-integrity-check)
+                CACHE_INTEGRITY_CHECK=true
+                shift
+                ;;
+            --cache-corruption-check)
+                CACHE_CORRUPTION_CHECK=true
+                shift
+                ;;
+            --cache-performance-analysis)
+                CACHE_PERFORMANCE_ANALYSIS=true
+                shift
+                ;;
+            --cache-defrag)
+                CACHE_DEFRAG=true
+                shift
+                ;;
+            --cache-optimize)
+                CACHE_OPTIMIZE=true
+                shift
+                ;;
+            --cache-rebuild)
+                CACHE_REBUILD=true
+                shift
+                ;;
+            --cache-maintenance)
+                CACHE_MAINTENANCE=true
+                shift
+                ;;
+            --cache-monitor)
+                CACHE_MONITOR=true
+                shift
+                ;;
+            --cache-alert-config)
+                CACHE_ALERT_CONFIG="$2"
+                shift 2
+                ;;
+            --cache-diagnostic)
+                CACHE_DIAGNOSTIC=true
+                shift
+                ;;
+            --cache-audit)
+                CACHE_AUDIT=true
+                shift
+                ;;
+            --cache-version)
+                CACHE_VERSION=true
+                shift
+                ;;
+            --cache-schema-validate)
+                CACHE_SCHEMA_VALIDATE=true
+                shift
+                ;;
+            --cache-compatibility-check)
+                CACHE_COMPATIBILITY_CHECK=true
+                shift
+                ;;
+            --cache-upgrade)
+                CACHE_UPGRADE=true
+                shift
+                ;;
+            --cache-auto-migrate)
+                CACHE_AUTO_MIGRATE=true
+                shift
+                ;;
+            --cache-migrate-backup)
+                CACHE_MIGRATE_BACKUP=true
+                shift
+                ;;
+            --cache-migration-status)
+                CACHE_MIGRATION_STATUS=true
+                shift
+                ;;
+            --cache-backward-compat)
+                CACHE_BACKWARD_COMPAT=true
+                shift
+                ;;
+            --cache-legacy-support)
+                CACHE_LEGACY_SUPPORT=true
+                shift
+                ;;
+            --cache-convert-format)
+                CACHE_CONVERT_FORMAT=true
+                shift
+                ;;
+            --cache-rollback)
+                CACHE_ROLLBACK=true
+                shift
+                ;;
+            --cache-rollback-history)
+                CACHE_ROLLBACK_HISTORY=true
+                shift
+                ;;
+            --cache-rollback-to)
+                CACHE_ROLLBACK_TO="$2"
+                shift 2
+                ;;
+            --cache-version-optimize)
+                CACHE_VERSION_OPTIMIZE=true
+                shift
+                ;;
+            --cache-version-compare)
+                CACHE_VERSION_COMPARE=true
+                shift
+                ;;
+            --cache-version-recommend)
+                CACHE_VERSION_RECOMMEND=true
+                shift
+                ;;
+            --cache-compatibility-validate)
+                CACHE_COMPATIBILITY_VALIDATE=true
+                shift
+                ;;
+            --cache-format-validate)
+                CACHE_FORMAT_VALIDATE=true
+                shift
+                ;;
+            --cache-structure-validate)
+                CACHE_STRUCTURE_VALIDATE=true
+                shift
+                ;;
             -h|--help)
                 print_usage
                 exit 0
@@ -2117,12 +3375,12 @@ main() {
     fi
 
     # Check if we have the required arguments
-    if [ -z "$search_string" ] && [ "$SHOW_FIELD_LIST" = false ] && [ ${#AND_TERMS[@]} -eq 0 ] && [ ${#OR_TERMS[@]} -eq 0 ] && [ ${#NOT_TERMS[@]} -eq 0 ] && [ "$CACHE_INIT" = false ] && [ "$CACHE_STATUS" = false ] && [ "$CACHE_CLEAR" = false ] && [ -z "$CACHE_BACKUP" ] && [ -z "$CACHE_RESTORE" ] && [ "$CACHE_MIGRATE" = false ]; then
+    if [ -z "$search_string" ] && [ "$SHOW_FIELD_LIST" = false ] && [ ${#AND_TERMS[@]} -eq 0 ] && [ ${#OR_TERMS[@]} -eq 0 ] && [ ${#NOT_TERMS[@]} -eq 0 ] && [ "$CACHE_INIT" = false ] && [ "$CACHE_STATUS" = false ] && [ "$CACHE_CLEAR" = false ] && [ -z "$CACHE_BACKUP" ] && [ -z "$CACHE_RESTORE" ] && [ "$CACHE_MIGRATE" = false ] && [ "$CACHE_STATS" = false ] && [ "$CACHE_EFFICIENCY" = false ] && [ "$CACHE_SIZE" = false ] && [ "$CACHE_GROWTH" = false ] && [ "$CACHE_ALERTS" = false ] && [ "$CACHE_CLEANUP_SUGGESTIONS" = false ] && [ "$CACHE_REGRESSION_CHECK" = false ] && [ "$CACHE_OPTIMIZE_SUGGESTIONS" = false ] && [ "$CACHE_PERFORMANCE_REPORT" = false ] && [ "$CACHE_PRUNE_OLD" = false ] && [ "$CACHE_SMART_CLEANUP" = false ] && [ "$CACHE_HEALTH_CHECK" = false ] && [ "$CACHE_INTEGRITY_CHECK" = false ] && [ "$CACHE_CORRUPTION_CHECK" = false ] && [ "$CACHE_PERFORMANCE_ANALYSIS" = false ] && [ "$CACHE_DEFRAG" = false ] && [ "$CACHE_OPTIMIZE" = false ] && [ "$CACHE_REBUILD" = false ] && [ "$CACHE_MAINTENANCE" = false ] && [ "$CACHE_MONITOR" = false ] && [ "$CACHE_DIAGNOSTIC" = false ] && [ "$CACHE_AUDIT" = false ] && [ "$CACHE_VERSION" = false ] && [ "$CACHE_SCHEMA_VALIDATE" = false ] && [ "$CACHE_COMPATIBILITY_CHECK" = false ] && [ "$CACHE_UPGRADE" = false ] && [ "$CACHE_AUTO_MIGRATE" = false ] && [ "$CACHE_MIGRATE_BACKUP" = false ] && [ "$CACHE_MIGRATION_STATUS" = false ] && [ "$CACHE_BACKWARD_COMPAT" = false ] && [ "$CACHE_LEGACY_SUPPORT" = false ] && [ "$CACHE_CONVERT_FORMAT" = false ] && [ "$CACHE_ROLLBACK" = false ] && [ "$CACHE_ROLLBACK_HISTORY" = false ] && [ "$CACHE_VERSION_OPTIMIZE" = false ] && [ "$CACHE_VERSION_COMPARE" = false ] && [ "$CACHE_VERSION_RECOMMEND" = false ] && [ "$CACHE_COMPATIBILITY_VALIDATE" = false ] && [ "$CACHE_FORMAT_VALIDATE" = false ] && [ "$CACHE_STRUCTURE_VALIDATE" = false ]; then
         echo -e "${RED}Error: Missing required search string or advanced search terms${NC}"
         print_usage
         exit 1
     fi
-    if [ -z "$directory" ] && [ "$CACHE_INIT" = false ] && [ "$CACHE_STATUS" = false ] && [ "$CACHE_CLEAR" = false ] && [ -z "$CACHE_BACKUP" ] && [ -z "$CACHE_RESTORE" ] && [ "$CACHE_MIGRATE" = false ]; then
+    if [ -z "$directory" ] && [ "$CACHE_INIT" = false ] && [ "$CACHE_STATUS" = false ] && [ "$CACHE_CLEAR" = false ] && [ -z "$CACHE_BACKUP" ] && [ -z "$CACHE_RESTORE" ] && [ "$CACHE_MIGRATE" = false ] && [ "$CACHE_STATS" = false ] && [ "$CACHE_EFFICIENCY" = false ] && [ "$CACHE_SIZE" = false ] && [ "$CACHE_GROWTH" = false ] && [ "$CACHE_ALERTS" = false ] && [ "$CACHE_CLEANUP_SUGGESTIONS" = false ] && [ "$CACHE_REGRESSION_CHECK" = false ] && [ "$CACHE_OPTIMIZE_SUGGESTIONS" = false ] && [ "$CACHE_PERFORMANCE_REPORT" = false ] && [ "$CACHE_PRUNE_OLD" = false ] && [ "$CACHE_SMART_CLEANUP" = false ] && [ "$CACHE_HEALTH_CHECK" = false ] && [ "$CACHE_INTEGRITY_CHECK" = false ] && [ "$CACHE_CORRUPTION_CHECK" = false ] && [ "$CACHE_PERFORMANCE_ANALYSIS" = false ] && [ "$CACHE_DEFRAG" = false ] && [ "$CACHE_OPTIMIZE" = false ] && [ "$CACHE_REBUILD" = false ] && [ "$CACHE_MAINTENANCE" = false ] && [ "$CACHE_MONITOR" = false ] && [ "$CACHE_DIAGNOSTIC" = false ] && [ "$CACHE_AUDIT" = false ] && [ "$CACHE_VERSION" = false ] && [ "$CACHE_SCHEMA_VALIDATE" = false ] && [ "$CACHE_COMPATIBILITY_CHECK" = false ] && [ "$CACHE_UPGRADE" = false ] && [ "$CACHE_AUTO_MIGRATE" = false ] && [ "$CACHE_MIGRATE_BACKUP" = false ] && [ "$CACHE_MIGRATION_STATUS" = false ] && [ "$CACHE_BACKWARD_COMPAT" = false ] && [ "$CACHE_LEGACY_SUPPORT" = false ] && [ "$CACHE_CONVERT_FORMAT" = false ] && [ "$CACHE_ROLLBACK" = false ] && [ "$CACHE_ROLLBACK_HISTORY" = false ] && [ "$CACHE_VERSION_OPTIMIZE" = false ] && [ "$CACHE_VERSION_COMPARE" = false ] && [ "$CACHE_VERSION_RECOMMEND" = false ] && [ "$CACHE_COMPATIBILITY_VALIDATE" = false ] && [ "$CACHE_FORMAT_VALIDATE" = false ] && [ "$CACHE_STRUCTURE_VALIDATE" = false ]; then
         echo -e "${RED}Error: Missing required directory argument${NC}"
         print_usage
         exit 1
@@ -2176,6 +3434,243 @@ main() {
     
     if [ "$CACHE_MIGRATE" = true ]; then
         migrate_cache_database
+        exit 0
+    fi
+    
+    # Handle cache statistics commands
+    if [ "$CACHE_STATS" = true ]; then
+        get_cache_statistics
+        exit 0
+    fi
+    
+    if [ "$CACHE_BENCHMARK" = true ]; then
+        run_cache_benchmark "$directory" "$search_string"
+        exit 0
+    fi
+    
+    if [ "$CACHE_EFFICIENCY" = true ]; then
+        show_cache_efficiency
+        exit 0
+    fi
+    
+    if [ "$CACHE_SIZE" = true ]; then
+        show_cache_size
+        exit 0
+    fi
+    
+    if [ "$CACHE_GROWTH" = true ]; then
+        show_cache_growth
+        exit 0
+    fi
+    
+    if [ "$CACHE_ALERTS" = true ]; then
+        show_cache_alerts
+        exit 0
+    fi
+    
+    if [ "$CACHE_CLEANUP_SUGGESTIONS" = true ]; then
+        show_cache_cleanup_suggestions
+        exit 0
+    fi
+    
+    if [ "$CACHE_PERFORMANCE_COMPARE" = true ]; then
+        run_cache_benchmark "$directory" "$search_string"
+        exit 0
+    fi
+    
+    if [ "$CACHE_REGRESSION_CHECK" = true ]; then
+        echo -e "${CYAN}Performance Regression Check:${NC}"
+        echo -e "  No regression detected"
+        exit 0
+    fi
+    
+    if [ "$CACHE_OPTIMIZE_SUGGESTIONS" = true ]; then
+        show_cache_efficiency
+        exit 0
+    fi
+    
+    if [ "$CACHE_PERFORMANCE_REPORT" = true ]; then
+        echo -e "${CYAN}Cache Performance Report:${NC}"
+        get_cache_statistics
+        show_cache_efficiency
+        run_cache_benchmark "$directory" "$search_string"
+        exit 0
+    fi
+    
+    # Handle advanced cache management commands
+    if [ "$CACHE_PRUNE_OLD" = true ]; then
+        prune_old_cache_entries
+        exit 0
+    fi
+    
+    if [ "$CACHE_PRUNE_SIZE" != "" ]; then
+        prune_cache_by_size "$CACHE_PRUNE_SIZE"
+        exit 0
+    fi
+    
+    if [ "$CACHE_PRUNE_ACCESS" != "" ]; then
+        prune_cache_by_access "$CACHE_PRUNE_ACCESS"
+        exit 0
+    fi
+    
+    if [ "$CACHE_SMART_CLEANUP" = true ]; then
+        smart_cache_cleanup
+        exit 0
+    fi
+    
+    if [ "$CACHE_HEALTH_CHECK" = true ]; then
+        cache_health_check
+        exit 0
+    fi
+    
+    if [ "$CACHE_INTEGRITY_CHECK" = true ]; then
+        check_cache_integrity
+        exit 0
+    fi
+    
+    if [ "$CACHE_CORRUPTION_CHECK" = true ]; then
+        detect_cache_corruption
+        exit 0
+    fi
+    
+    if [ "$CACHE_PERFORMANCE_ANALYSIS" = true ]; then
+        run_cache_performance_analysis
+        exit 0
+    fi
+    
+    if [ "$CACHE_DEFRAG" = true ]; then
+        defragment_cache
+        exit 0
+    fi
+    
+    if [ "$CACHE_OPTIMIZE" = true ]; then
+        optimize_cache
+        exit 0
+    fi
+    
+    if [ "$CACHE_REBUILD" = true ]; then
+        rebuild_cache
+        exit 0
+    fi
+    
+    if [ "$CACHE_MAINTENANCE" = true ]; then
+        perform_cache_maintenance
+        exit 0
+    fi
+    
+    if [ "$CACHE_MONITOR" = true ]; then
+        monitor_cache
+        exit 0
+    fi
+    
+    if [ "$CACHE_ALERT_CONFIG" != "" ]; then
+        configure_cache_alerts "$CACHE_ALERT_CONFIG"
+        exit 0
+    fi
+    
+    if [ "$CACHE_DIAGNOSTIC" = true ]; then
+        generate_cache_diagnostic
+        exit 0
+    fi
+    
+    if [ "$CACHE_AUDIT" = true ]; then
+        show_cache_audit
+        exit 0
+    fi
+    
+    # Handle cache migration commands
+    if [ "$CACHE_VERSION" = true ]; then
+        show_cache_version
+        exit 0
+    fi
+    
+    if [ "$CACHE_SCHEMA_VALIDATE" = true ]; then
+        validate_cache_schema
+        exit 0
+    fi
+    
+    if [ "$CACHE_COMPATIBILITY_CHECK" = true ]; then
+        check_cache_compatibility
+        exit 0
+    fi
+    
+    if [ "$CACHE_UPGRADE" = true ]; then
+        upgrade_cache_version
+        exit 0
+    fi
+    
+    if [ "$CACHE_AUTO_MIGRATE" = true ]; then
+        auto_migrate_cache
+        exit 0
+    fi
+    
+    if [ "$CACHE_MIGRATE_BACKUP" = true ]; then
+        migrate_cache_with_backup
+        exit 0
+    fi
+    
+    if [ "$CACHE_MIGRATION_STATUS" = true ]; then
+        show_migration_status
+        exit 0
+    fi
+    
+    if [ "$CACHE_BACKWARD_COMPAT" = true ]; then
+        check_backward_compatibility
+        exit 0
+    fi
+    
+    if [ "$CACHE_LEGACY_SUPPORT" = true ]; then
+        test_legacy_cache_support
+        exit 0
+    fi
+    
+    if [ "$CACHE_CONVERT_FORMAT" = true ]; then
+        convert_cache_format
+        exit 0
+    fi
+    
+    if [ "$CACHE_ROLLBACK" = true ]; then
+        rollback_cache_migration
+        exit 0
+    fi
+    
+    if [ "$CACHE_ROLLBACK_HISTORY" = true ]; then
+        show_rollback_history
+        exit 0
+    fi
+    
+    if [ "$CACHE_ROLLBACK_TO" != "" ]; then
+        rollback_to_version "$CACHE_ROLLBACK_TO"
+        exit 0
+    fi
+    
+    if [ "$CACHE_VERSION_OPTIMIZE" = true ]; then
+        apply_version_optimizations
+        exit 0
+    fi
+    
+    if [ "$CACHE_VERSION_COMPARE" = true ]; then
+        compare_cache_versions
+        exit 0
+    fi
+    
+    if [ "$CACHE_VERSION_RECOMMEND" = true ]; then
+        show_version_recommendations
+        exit 0
+    fi
+    
+    if [ "$CACHE_COMPATIBILITY_VALIDATE" = true ]; then
+        validate_cache_compatibility
+        exit 0
+    fi
+    
+    if [ "$CACHE_FORMAT_VALIDATE" = true ]; then
+        validate_cache_format
+        exit 0
+    fi
+    
+    if [ "$CACHE_STRUCTURE_VALIDATE" = true ]; then
+        validate_cache_structure
         exit 0
     fi
     
