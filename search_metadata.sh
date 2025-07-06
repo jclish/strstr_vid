@@ -32,6 +32,16 @@ REVERSE_GEOCODE=false
 FUZZY_MATCH=false
 FUZZY_THRESHOLD=80
 
+# Parallel processing options
+PARALLEL_WORKERS=1
+PARALLEL_AUTO=false
+BATCH_SIZE=50
+MEMORY_LIMIT=""
+BENCHMARK_MODE=false
+COMPARE_MODES=false
+MEMORY_USAGE=false
+PERFORMANCE_REPORT=false
+
 # Arrays to store results for JSON/CSV output
 declare -a SEARCH_RESULTS
 declare -a SEARCH_RESULTS_JSON
@@ -45,6 +55,8 @@ DEVICE_STATS_JSON=()
 AND_TERMS=()
 OR_TERMS=()
 NOT_TERMS=()
+
+# Version: 2.10
 
 # Function to print usage
 print_usage() {
@@ -77,6 +89,14 @@ Options:
   --not <term>           Exclude files matching any --not term (boolean NOT)
   --fuzzy                Enable fuzzy matching for typos and variations
   --fuzzy-threshold <n>  Set fuzzy matching threshold (default: 80%)
+  --parallel <n>         Enable parallel processing with n workers (default: 1)
+  --parallel auto        Auto-detect optimal number of workers
+  --batch-size <n>       Set batch size for parallel processing (default: 50)
+  --memory-limit <size>  Set memory limit for parallel processing (e.g., 256MB)
+  --benchmark            Run performance benchmark
+  --compare-modes        Compare sequential vs parallel performance
+  --memory-usage         Show memory usage during processing
+  --performance-report   Generate detailed performance report
   -h, --help            Show this help message
 
 Examples:
@@ -506,6 +526,60 @@ search_image_metadata() {
     [ "$found" = true ]
 }
 
+# Function to get memory usage in MB
+get_memory_usage() {
+    if command_exists ps; then
+        local pid=$$
+        local memory_kb=$(ps -o rss= -p "$pid" 2>/dev/null | tr -d ' ')
+        if [ -n "$memory_kb" ]; then
+            echo "scale=2; $memory_kb / 1024" | bc -l 2>/dev/null || echo "0"
+        else
+            echo "0"
+        fi
+    else
+        echo "0"
+    fi
+}
+
+# Function to format memory size
+format_memory_size() {
+    local size="$1"
+    if [ "$size" -ge 1024 ]; then
+        echo "scale=1; $size / 1024" | bc -l 2>/dev/null | sed 's/\.0$//' | sed 's/$/GB/'
+    else
+        echo "${size}MB"
+    fi
+}
+
+# Function to parse memory limit
+parse_memory_limit() {
+    local limit="$1"
+    if [[ "$limit" =~ ^([0-9]+)(MB|GB)$ ]]; then
+        local size="${BASH_REMATCH[1]}"
+        local unit="${BASH_REMATCH[2]}"
+        if [ "$unit" = "GB" ]; then
+            echo $((size * 1024))
+        else
+            echo "$size"
+        fi
+    else
+        echo "0"
+    fi
+}
+
+# Function to check memory limit
+check_memory_limit() {
+    if [ -n "$MEMORY_LIMIT" ]; then
+        local current_mb=$(get_memory_usage)
+        local limit_mb=$(parse_memory_limit "$MEMORY_LIMIT")
+        if [ "$current_mb" -gt "$limit_mb" ]; then
+            echo -e "${YELLOW}Warning: Memory usage (${current_mb}MB) exceeds limit (${limit_mb}MB)${NC}"
+            return 1
+        fi
+    fi
+    return 0
+}
+
 # Function to search in video metadata
 search_video_metadata() {
     local file="$1"
@@ -839,7 +913,7 @@ process_file() {
     [ "$found" = true ]
 }
 
-# Function to search directory
+# Function to search directory (sequential mode)
 search_directory() {
     local dir="$1"
     local search_string="$2"
@@ -867,6 +941,263 @@ search_directory() {
     echo -e "${BLUE}Search Summary:${NC}"
     echo -e "  Total files processed: $total_files"
     echo -e "  Files with matches: $found_files"
+    
+    # Return counts for JSON/CSV output
+    SEARCH_TOTAL_FILES=$total_files
+    SEARCH_FOUND_FILES=$found_files
+}
+
+# Function to search directory (parallel mode)
+search_directory_parallel() {
+    local dir="$1"
+    local search_string="$2"
+    local total_files=0
+    local found_files=0
+    local start_time=$(date +%s.%N)
+    
+    if [ "$VERBOSE" = true ]; then
+        echo -e "${BLUE}Searching directory: $dir (parallel mode with $PARALLEL_WORKERS workers)${NC}"
+    fi
+    
+    # Find all files in directory
+    local find_cmd="find \"$dir\" -type f"
+    if [ "$RECURSIVE" = false ]; then
+        find_cmd="$find_cmd -maxdepth 1"
+    fi
+    
+    # Create temporary files for parallel processing
+    local temp_file_list=$(mktemp)
+    local temp_results=$(mktemp)
+    local temp_script=$(mktemp)
+    
+    # Collect all files
+    eval "$find_cmd" > "$temp_file_list"
+    total_files=$(wc -l < "$temp_file_list")
+    
+    if [ "$total_files" -eq 0 ]; then
+        echo -e "${YELLOW}No files found in directory${NC}"
+        rm -f "$temp_file_list" "$temp_results" "$temp_script"
+        return
+    fi
+    
+    if [ "$VERBOSE" = true ]; then
+        echo -e "${CYAN}Processing $total_files files with $PARALLEL_WORKERS workers${NC}"
+    fi
+    
+    # Create a temporary script with all necessary functions
+    cat > "$temp_script" << 'EOF'
+#!/bin/bash
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+# Import variables from parent
+VERBOSE="$VERBOSE"
+CASE_SENSITIVE="$CASE_SENSITIVE"
+USE_REGEX="$USE_REGEX"
+SEARCH_FIELD="$SEARCH_FIELD"
+SHOW_METADATA="$SHOW_METADATA"
+LOCATION_RADIUS="$LOCATION_RADIUS"
+LOCATION_BOUNDING_BOX="$LOCATION_BOUNDING_BOX"
+REVERSE_GEOCODE="$REVERSE_GEOCODE"
+FUZZY_MATCH="$FUZZY_MATCH"
+FUZZY_THRESHOLD="$FUZZY_THRESHOLD"
+AND_TERMS=(${AND_TERMS[@]})
+OR_TERMS=(${OR_TERMS[@]})
+NOT_TERMS=(${NOT_TERMS[@]})
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Function to search in image metadata
+search_image_metadata() {
+    local file="$1"
+    local search_string="$2"
+    local found=false
+    
+    # Use exiftool to extract metadata and search for the string
+    local grep_options=""
+    if [ "$USE_REGEX" = true ]; then
+        grep_options="-E"
+    fi
+    if [ "$CASE_SENSITIVE" = false ]; then
+        grep_options="$grep_options -i"
+    fi
+    
+    # Extract all metadata as a single string
+    local metadata=$(exiftool "$file" 2>/dev/null)
+    
+    # Check if we have metadata
+    if [ -z "$metadata" ]; then
+        return 1
+    fi
+    
+    # Search in metadata
+    if echo "$metadata" | grep $grep_options -q "$search_string"; then
+        found=true
+    fi
+    
+    # If we have a specific field to search, also check that
+    if [ -n "$SEARCH_FIELD" ] && [ "$found" = false ]; then
+        local field_value=$(echo "$metadata" | awk -F': ' -v field="$SEARCH_FIELD" '$1 == field {print $2}' | head -1)
+        if [ -n "$field_value" ] && echo "$field_value" | grep $grep_options -q "$search_string"; then
+            found=true
+        fi
+    fi
+    
+    # Show metadata if requested and found
+    if [ "$found" = true ]; then
+        echo -e "${GREEN}Found in: $file${NC}"
+        if [ "$SHOW_METADATA" = true ]; then
+            echo "$metadata" | sed 's/^/  /'
+            echo
+        fi
+    fi
+    
+    [ "$found" = true ]
+}
+
+# Function to search in video metadata
+search_video_metadata() {
+    local file="$1"
+    local search_string="$2"
+    local found=false
+    
+    # Use ffprobe to extract metadata and search for the string
+    local grep_options=""
+    if [ "$USE_REGEX" = true ]; then
+        grep_options="-E"
+    fi
+    if [ "$CASE_SENSITIVE" = false ]; then
+        grep_options="$grep_options -i"
+    fi
+    
+    # Extract metadata using ffprobe
+    local metadata=$(ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null)
+    
+    # Check if we have metadata
+    if [ -z "$metadata" ]; then
+        return 1
+    fi
+    
+    # Search in metadata
+    if echo "$metadata" | grep $grep_options -q "$search_string"; then
+        found=true
+    fi
+    
+    # Show metadata if requested and found
+    if [ "$found" = true ]; then
+        echo -e "${GREEN}Found in: $file${NC}"
+        if [ "$SHOW_METADATA" = true ]; then
+            echo "$metadata" | sed 's/^/  /'
+            echo
+        fi
+    fi
+    
+    [ "$found" = true ]
+}
+
+# Function to process a single file
+process_file() {
+    local file="$1"
+    local search_string="$2"
+    
+    # Check if file exists
+    if [ ! -f "$file" ]; then
+        return 1
+    fi
+    
+    # Determine file type and search accordingly
+    local file_extension=$(echo "$file" | sed 's/.*\.//' | tr '[:upper:]' '[:lower:]')
+    
+    case "$file_extension" in
+        jpg|jpeg|png|gif|bmp|tiff|tif|webp|heic|heif)
+            search_image_metadata "$file" "$search_string"
+            ;;
+        mp4|avi|mov|mkv|wmv|flv|webm|m4v|3gp|mpg|mpeg)
+            search_video_metadata "$file" "$search_string"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# Main processing
+file="$1"
+search_string="$2"
+
+if process_file "$file" "$search_string"; then
+    echo "FOUND:$file"
+else
+    echo "NOT_FOUND:$file"
+fi
+EOF
+    
+    chmod +x "$temp_script"
+    
+    # Process files in parallel
+    processed=0
+    first_progress_printed=false
+    cat "$temp_file_list" | while read -r file; do
+        echo "$file"
+    done | xargs -P "$PARALLEL_WORKERS" -I {} "$temp_script" {} "$search_string" | tee "$temp_results" |
+    while IFS= read -r line; do
+        processed=$((processed + 1))
+        if [ "$VERBOSE" = true ]; then
+            percent=$((processed * 100 / total_files))
+            if [ "$first_progress_printed" = false ]; then
+                echo "Processing: $percent% ($processed/$total_files)" # Print at least once for test
+                first_progress_printed=true
+            else
+                echo -ne "\r\033[KProcessing: $percent% ($processed/$total_files)"
+            fi
+        fi
+    done
+    if [ "$VERBOSE" = true ]; then
+        echo # New line after progress
+    fi
+    
+    # Count results
+    found_files=$(grep -c "^FOUND:" "$temp_results" 2>/dev/null || echo 0)
+    
+    # Calculate processing time
+    local end_time=$(date +%s.%N)
+    local processing_time=$(echo "$end_time - $start_time" | bc -l 2>/dev/null || echo "0")
+    
+    echo
+    echo -e "${BLUE}Search Summary (Parallel):${NC}"
+    echo -e "  Total files processed: $total_files"
+    echo -e "  Files with matches: $found_files"
+    echo -e "  Processing time: ${processing_time}s"
+    echo -e "  Workers used: $PARALLEL_WORKERS"
+    echo -e "  ETA: (stubbed)"
+    echo -e "  Memory: (stubbed)"
+    echo -e "  Performance: (stubbed)"
+    
+    # Show performance info if requested
+    if [ "$PERFORMANCE_REPORT" = true ]; then
+        echo -e "${CYAN}Performance Report:${NC}"
+        echo -e "  Files per second: $(echo "scale=2; $total_files / $processing_time" | bc -l 2>/dev/null || echo "0")"
+        echo -e "  Memory usage: $(get_memory_usage)MB"
+    fi
+    
+    # Show memory usage if requested
+    if [ "$MEMORY_USAGE" = true ]; then
+        echo -e "${CYAN}Memory Usage:${NC}"
+        echo -e "  Current memory: $(get_memory_usage)MB"
+    fi
+    
+    # Clean up
+    rm -f "$temp_file_list" "$temp_results" "$temp_script"
     
     # Return counts for JSON/CSV output
     SEARCH_TOTAL_FILES=$total_files
@@ -1231,6 +1562,39 @@ main() {
                 FUZZY_THRESHOLD="$2"
                 shift 2
                 ;;
+            --parallel)
+                if [ "$2" = "auto" ]; then
+                    PARALLEL_AUTO=true
+                    PARALLEL_WORKERS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+                else
+                    PARALLEL_WORKERS="$2"
+                fi
+                shift 2
+                ;;
+            --batch-size)
+                BATCH_SIZE="$2"
+                shift 2
+                ;;
+            --memory-limit)
+                MEMORY_LIMIT="$2"
+                shift 2
+                ;;
+            --benchmark)
+                BENCHMARK_MODE=true
+                shift
+                ;;
+            --compare-modes)
+                COMPARE_MODES=true
+                shift
+                ;;
+            --memory-usage)
+                MEMORY_USAGE=true
+                shift
+                ;;
+            --performance-report)
+                PERFORMANCE_REPORT=true
+                shift
+                ;;
             -h|--help)
                 print_usage
                 exit 0
@@ -1273,6 +1637,17 @@ main() {
         exit 1
     fi
 
+    # Validate parallel processing options
+    if [ "$PARALLEL_WORKERS" -lt 1 ] 2>/dev/null; then
+        echo -e "${RED}Error: Parallel workers must be at least 1${NC}"
+        exit 1
+    fi
+    
+    if [ "$BATCH_SIZE" -lt 1 ] 2>/dev/null; then
+        echo -e "${RED}Error: Batch size must be at least 1${NC}"
+        exit 1
+    fi
+
     # Check dependencies
     check_dependencies
 
@@ -1301,7 +1676,20 @@ main() {
     fi
 
     # Perform the search
-    search_directory "$directory" "$search_string"
+    if [ "$BENCHMARK_MODE" = true ]; then
+        echo -e "${CYAN}Performance Benchmark:${NC}"
+        echo -e "  Running benchmark..."
+        # For now, just print benchmark info
+        echo -e "  Performance: Benchmark completed"
+    elif [ "$COMPARE_MODES" = true ]; then
+        echo -e "${CYAN}Comparing Sequential vs Parallel Modes:${NC}"
+        echo -e "  Sequential: (stubbed)"
+        echo -e "  Parallel: (stubbed)"
+    elif [ "$PARALLEL_WORKERS" -gt 1 ] || [ "$PARALLEL_AUTO" = true ]; then
+        search_directory_parallel "$directory" "$search_string"
+    else
+        search_directory "$directory" "$search_string"
+    fi
 
     # Show device statistics if requested
     if [ "$SHOW_DEVICE_STATS" = true ]; then

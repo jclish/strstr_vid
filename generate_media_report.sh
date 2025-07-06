@@ -32,6 +32,7 @@ MAX_SIZE=""
 IMAGES_ONLY=false
 VIDEOS_ONLY=false
 FILTER_FORMAT=""
+PARALLEL_WORKERS=1
 
 # Global variables for main function
 
@@ -63,6 +64,7 @@ Options:
   --images-only            Filter: only include image files
   --videos-only            Filter: only include video files
   --format <format>        Filter: only include files of this format (e.g. jpg, mp4)
+  --parallel <n>           Enable parallel processing with n workers (default: 1)
   -h, --help               Show this help message
 
 Examples:
@@ -1609,6 +1611,10 @@ main() {
                 ;;
             --format)
                 filter_format="$2"
+                shift 2
+                ;;
+            --parallel)
+                PARALLEL_WORKERS="$2"
                 shift 2
                 ;;
             -h|--help)
