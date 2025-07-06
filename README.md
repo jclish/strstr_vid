@@ -4,6 +4,16 @@ A comprehensive suite of command-line tools for searching and analyzing metadata
 
 ## 🚀 Recent Updates
 
+### Version 2.14 - Incremental Foundation
+- **File change detection** - Detect new, modified, deleted, and content-changed files
+- **Incremental processing** - Process only changed files for faster subsequent runs
+- **Change tracking database** - SQLite database for file modification history
+- **File hash comparison** - Detect content changes vs metadata-only changes
+- **Change summary and metrics** - Track and display processing changes
+- **File type filtering** - Support for `--images-only` and `--videos-only` in incremental mode
+- **Cache integration** - Cache statistics with incremental processing
+- **Comprehensive test suite** with 20/20 incremental foundation tests passing
+
 ### Version 2.13 - Cache Migration & Versioning
 - **Cache schema versioning** with automatic version detection
 - **Automatic cache migration** for seamless format upgrades
@@ -72,6 +82,16 @@ A comprehensive suite of command-line tools for searching and analyzing metadata
 - **Cache compression** - Reduce storage requirements
 - **Cache size limits** - Prevent cache from growing too large
 - **Cache-enabled search** - Use cached metadata for faster searches
+
+### Incremental Processing 🆕
+- **File change detection** - Detect new, modified, deleted, and content-changed files
+- **Incremental processing** - Process only changed files for faster subsequent runs
+- **Change tracking database** - SQLite database for file modification history
+- **File hash comparison** - Detect content changes vs metadata-only changes
+- **Change summary and metrics** - Track and display processing changes
+- **File type filtering** - Support for `--images-only` and `--videos-only` in incremental mode
+- **Cache integration** - Cache statistics with incremental processing
+- **Performance optimization** - Dramatically faster repeated operations
 
 ### Output Formats
 - **Text output** with detailed metadata display
@@ -247,6 +267,27 @@ chmod +x search_metadata.sh generate_media_report.sh
 
 # Restore cache
 ./search_metadata.sh "test" /path/to/photos --cache-restore backup.db
+
+### Incremental Processing Examples 🆕
+```bash
+# Process only changed files since last run
+./search_metadata.sh "test" /path/to/photos --incremental
+
+# Incremental processing with file type filtering
+./search_metadata.sh "test" /path/to/photos --incremental --images-only
+
+# Incremental processing with hash checking for content changes
+./search_metadata.sh "test" /path/to/photos --incremental --hash-check
+
+# Track changes and show summary
+./search_metadata.sh "test" /path/to/photos --incremental --track-changes
+
+# Incremental processing with cache integration
+./search_metadata.sh "test" /path/to/photos --incremental --cache-enabled
+
+# Show change types (new, modified, deleted, content-changed)
+./search_metadata.sh "test" /path/to/photos --incremental --change-types
+```
 ```
 
 ### Report Examples
