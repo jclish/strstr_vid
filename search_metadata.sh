@@ -42,6 +42,20 @@ COMPARE_MODES=false
 MEMORY_USAGE=false
 PERFORMANCE_REPORT=false
 
+# Caching options
+CACHE_ENABLED=false
+CACHE_DB="${CACHE_DB:-}"
+CACHE_INIT=false
+CACHE_STORE=false
+CACHE_RETRIEVE=false
+CACHE_STATUS=false
+CACHE_CLEAR=false
+CACHE_MIGRATE=false
+CACHE_BACKUP=""
+CACHE_RESTORE=""
+CACHE_SIZE_LIMIT=""
+CACHE_COMPRESS=false
+
 # Arrays to store results for JSON/CSV output
 declare -a SEARCH_RESULTS
 declare -a SEARCH_RESULTS_JSON
@@ -97,6 +111,17 @@ Options:
   --compare-modes        Compare sequential vs parallel performance
   --memory-usage         Show memory usage during processing
   --performance-report   Generate detailed performance report
+  --cache-init          Initialize metadata cache database
+  --cache-store         Store metadata in cache
+  --cache-retrieve      Retrieve metadata from cache
+  --cache-status        Show cache status and statistics
+  --cache-clear         Clear all cached metadata
+  --cache-migrate       Migrate cache to latest version
+  --cache-backup <file> Backup cache database to file
+  --cache-restore <file> Restore cache database from file
+  --cache-size-limit <size> Set cache size limit (e.g., 100MB)
+  --cache-compress      Enable cache compression
+  --cache-enabled       Enable cache for search operations
   -h, --help            Show this help message
 
 Examples:
@@ -406,6 +431,34 @@ search_image_metadata() {
         echo -e "${BLUE}Searching in image: $file${NC}"
     fi
     
+    # Check cache first if enabled
+    local metadata_full=""
+    if [ "$CACHE_ENABLED" = true ]; then
+        if is_file_cached "$file"; then
+            # Check if file has been modified since caching
+            local cached_modified_time=$(get_cached_modified_time "$file")
+            local current_modified_time=$(stat -f%m "$file" 2>/dev/null || stat -c%Y "$file" 2>/dev/null || echo "")
+            
+            if [ "$cached_modified_time" != "$current_modified_time" ]; then
+                # File has been modified, invalidate cache
+                invalidate_cache_entry "$file"
+                echo "Cache invalidated: $file (file modified)"
+            else
+                metadata_full=$(get_cached_metadata "$file")
+                if [ -n "$metadata_full" ]; then
+                    if [ "$VERBOSE" = true ]; then
+                        echo -e "${BLUE}Using cached metadata for: $file${NC}"
+                    fi
+                fi
+            fi
+        fi
+    fi
+    
+    # If not cached or cache disabled, extract metadata
+    if [ -z "$metadata_full" ]; then
+        metadata_full="$(exiftool "$file" 2>/dev/null)"
+    fi
+    
     # Use exiftool to extract metadata and search for the string
     local grep_options=""
     if [ "$USE_REGEX" = true ]; then
@@ -414,9 +467,6 @@ search_image_metadata() {
     if [ "$CASE_SENSITIVE" = false ]; then
         grep_options="$grep_options -i"
     fi
-    
-    # Extract all metadata as a single string
-    local metadata_full="$(exiftool "$file" 2>/dev/null)"
 
     if [ ${#AND_TERMS[@]} -gt 0 ] || [ ${#OR_TERMS[@]} -gt 0 ] || [ ${#NOT_TERMS[@]} -gt 0 ]; then
         if matches_advanced_search "$metadata_full"; then
@@ -522,7 +572,19 @@ search_image_metadata() {
             echo
         fi
     fi
-    
+
+    # Store in cache if enabled and not already cached
+    if [ "$found" = true ] && [ "$CACHE_ENABLED" = true ]; then
+        if ! is_file_cached "$file"; then
+            local file_size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "0")
+            local file_hash=$(sha256sum "$file" 2>/dev/null | cut -d' ' -f1 || echo "")
+            local modified_time=$(stat -f%m "$file" 2>/dev/null || stat -c%Y "$file" 2>/dev/null || echo "")
+            local file_type=$(echo "$file" | sed 's/.*\.//' | tr '[:upper:]' '[:lower:]')
+            store_metadata_in_cache "$file" "$metadata_full"
+            store_file_info "$file" "$file_size" "$file_hash" "$modified_time" "$file_type"
+        fi
+    fi
+
     [ "$found" = true ]
 }
 
@@ -558,9 +620,9 @@ parse_memory_limit() {
         local size="${BASH_REMATCH[1]}"
         local unit="${BASH_REMATCH[2]}"
         if [ "$unit" = "GB" ]; then
-            echo $((size * 1024))
+            echo $((size * 1024 * 1024 * 1024))
         else
-            echo "$size"
+            echo $((size * 1024 * 1024))
         fi
     else
         echo "0"
@@ -578,6 +640,360 @@ check_memory_limit() {
         fi
     fi
     return 0
+}
+
+# Function to get cache database path
+get_cache_db_path() {
+    if [ -n "$CACHE_DB" ]; then
+        echo "$CACHE_DB"
+    else
+        echo "$HOME/.metadata_cache.db"
+    fi
+}
+
+# Function to initialize cache database
+init_cache_database() {
+    local db_path=$(get_cache_db_path)
+    local db_dir=$(dirname "$db_path")
+    
+    # Create directory if it doesn't exist
+    if [ ! -d "$db_dir" ]; then
+        mkdir -p "$db_dir"
+    fi
+    
+    # Create database and tables
+    sqlite3 "$db_path" << 'EOF'
+-- Metadata table
+CREATE TABLE IF NOT EXISTS metadata (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_path TEXT UNIQUE NOT NULL,
+    file_hash TEXT NOT NULL,
+    metadata_json TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- File info table
+CREATE TABLE IF NOT EXISTS file_info (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_path TEXT UNIQUE NOT NULL,
+    file_size INTEGER NOT NULL,
+    file_hash TEXT NOT NULL,
+    modified_time DATETIME NOT NULL,
+    file_type TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Cache stats table
+CREATE TABLE IF NOT EXISTS cache_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT UNIQUE NOT NULL,
+    value TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_file_path ON metadata(file_path);
+CREATE INDEX IF NOT EXISTS idx_file_hash ON metadata(file_hash);
+CREATE INDEX IF NOT EXISTS idx_created_at ON metadata(created_at);
+CREATE INDEX IF NOT EXISTS idx_file_info_path ON file_info(file_path);
+CREATE INDEX IF NOT EXISTS idx_file_info_hash ON file_info(file_hash);
+
+-- Insert initial cache version
+INSERT OR REPLACE INTO cache_stats (key, value) VALUES ('version', '1.0');
+INSERT OR REPLACE INTO cache_stats (key, value) VALUES ('created_at', datetime('now'));
+EOF
+    
+    # Set cache size limit if specified
+    if [ -n "$CACHE_SIZE_LIMIT" ]; then
+        local size_bytes=$(parse_memory_limit "$CACHE_SIZE_LIMIT")
+        sqlite3 "$db_path" "INSERT OR REPLACE INTO cache_stats (key, value) VALUES ('size_limit', '$size_bytes');"
+    fi
+    
+    # Enable compression if specified
+    if [ "$CACHE_COMPRESS" = true ]; then
+        sqlite3 "$db_path" "INSERT OR REPLACE INTO cache_stats (key, value) VALUES ('compression', 'enabled');"
+        # Enable SQLite compression (if available)
+        sqlite3 "$db_path" "PRAGMA auto_vacuum = INCREMENTAL;"
+    fi
+    
+    echo -e "${GREEN}Cache database initialized: $db_path${NC}"
+}
+
+# Function to check cache status
+check_cache_status() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache Status: Not initialized${NC}"
+        return 1
+    fi
+    
+    # Get cache statistics
+    local total_files=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM metadata;" 2>/dev/null || echo "0")
+    local cache_size=$(sqlite3 "$db_path" "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size();" 2>/dev/null || echo "0")
+    local version=$(sqlite3 "$db_path" "SELECT value FROM cache_stats WHERE key='version';" 2>/dev/null || echo "unknown")
+    
+    echo -e "${BLUE}Cache Status:${NC}"
+    echo -e "  Database: $db_path"
+    echo -e "  Version: $version"
+    echo -e "  Total files: $total_files"
+    echo -e "  Size: ${cache_size} bytes"
+}
+
+# Function to clear cache
+clear_cache() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not found${NC}"
+        return 1
+    fi
+    
+    sqlite3 "$db_path" "DELETE FROM metadata; DELETE FROM file_info;"
+    echo -e "${GREEN}Cache cleared${NC}"
+}
+
+# Function to backup cache
+backup_cache() {
+    local db_path=$(get_cache_db_path)
+    local backup_path="$1"
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not found${NC}"
+        return 1
+    fi
+    
+    if [ -z "$backup_path" ]; then
+        echo -e "${RED}Error: Backup path required${NC}"
+        return 1
+    fi
+    
+    cp "$db_path" "$backup_path"
+    echo -e "${GREEN}Cache backed up to: $backup_path${NC}"
+}
+
+# Function to restore cache
+restore_cache() {
+    local db_path=$(get_cache_db_path)
+    local backup_path="$1"
+    
+    if [ -z "$backup_path" ]; then
+        echo -e "${RED}Error: Backup path required${NC}"
+        return 1
+    fi
+    
+    if [ ! -f "$backup_path" ]; then
+        echo -e "${RED}Error: Backup file not found${NC}"
+        return 1
+    fi
+    
+    cp "$backup_path" "$db_path"
+    echo -e "${GREEN}Cache restored from: $backup_path${NC}"
+}
+
+# Function to store metadata in cache
+store_metadata_in_cache() {
+    local db_path=$(get_cache_db_path)
+    local file_path="$1"
+    local metadata_json="$2"
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    # Calculate file hash
+    local file_hash=$(sha256sum "$file_path" 2>/dev/null | cut -d' ' -f1 || echo "")
+    if [ -z "$file_hash" ]; then
+        echo -e "${YELLOW}Could not calculate hash for: $file_path${NC}"
+        return 1
+    fi
+    
+    # Get file info
+    local file_size=$(stat -f%z "$file_path" 2>/dev/null || stat -c%s "$file_path" 2>/dev/null || echo "0")
+    local modified_time=$(stat -f%m "$file_path" 2>/dev/null || stat -c%Y "$file_path" 2>/dev/null || echo "")
+    local file_type=$(echo "$file_path" | sed 's/.*\.//' | tr '[:upper:]' '[:lower:]')
+    
+    # Store in database
+    sqlite3 "$db_path" << EOF
+INSERT OR REPLACE INTO metadata (file_path, file_hash, metadata_json, updated_at)
+VALUES ('$file_path', '$file_hash', '$metadata_json', datetime('now'));
+EOF
+    
+    # Store file info
+    store_file_info "$file_path" "$file_size" "$file_hash" "$modified_time" "$file_type"
+    
+    echo -e "${GREEN}Stored metadata for: $file_path${NC}"
+}
+
+# Function to retrieve metadata from cache
+retrieve_metadata_from_cache() {
+    local db_path=$(get_cache_db_path)
+    local file_path="$1"
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not initialized${NC}"
+        return 1
+    fi
+    
+    # Check if file exists in cache
+    local cached_data=$(sqlite3 "$db_path" "SELECT metadata_json FROM metadata WHERE file_path='$file_path';" 2>/dev/null)
+    
+    if [ -n "$cached_data" ]; then
+        echo -e "${GREEN}Cache hit: $file_path${NC}"
+        echo "$cached_data"
+        return 0
+    else
+        echo -e "${YELLOW}Cache miss: $file_path${NC}"
+        return 1
+    fi
+}
+
+# Function to migrate cache database
+migrate_cache_database() {
+    local db_path=$(get_cache_db_path)
+    
+    if [ ! -f "$db_path" ]; then
+        echo -e "${YELLOW}Cache not found${NC}"
+        return 1
+    fi
+    
+    # Check current version
+    local current_version=$(sqlite3 "$db_path" "SELECT value FROM cache_stats WHERE key='version';" 2>/dev/null || echo "0.0")
+    
+    if [ "$current_version" = "1.0" ]; then
+        echo -e "${GREEN}Cache is already at latest version${NC}"
+        return 0
+    fi
+    
+    # Perform migration
+    sqlite3 "$db_path" << 'EOF'
+-- Add missing tables if they don't exist
+CREATE TABLE IF NOT EXISTS file_info (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_path TEXT UNIQUE NOT NULL,
+    file_size INTEGER NOT NULL,
+    file_hash TEXT NOT NULL,
+    modified_time DATETIME NOT NULL,
+    file_type TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS cache_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT UNIQUE NOT NULL,
+    value TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add indexes if they don't exist
+CREATE INDEX IF NOT EXISTS idx_file_info_path ON file_info(file_path);
+CREATE INDEX IF NOT EXISTS idx_file_info_hash ON file_info(file_hash);
+
+-- Update version
+INSERT OR REPLACE INTO cache_stats (key, value) VALUES ('version', '1.0');
+EOF
+    
+    echo -e "${GREEN}Cache migrated to version 1.0${NC}"
+}
+
+# Function to check if file is cached and valid
+is_file_cached() {
+    local db_path=$(get_cache_db_path)
+    local file_path="$1"
+    
+    if [ ! -f "$db_path" ]; then
+        return 1
+    fi
+    
+    # Check if file exists in cache
+    local cached_hash=$(sqlite3 "$db_path" "SELECT file_hash FROM metadata WHERE file_path='$file_path';" 2>/dev/null)
+    if [ -z "$cached_hash" ]; then
+        return 1
+    fi
+    
+    # Check if file has changed
+    local current_hash=$(sha256sum "$file_path" 2>/dev/null | cut -d' ' -f1 || echo "")
+    if [ "$cached_hash" != "$current_hash" ]; then
+        return 1
+    fi
+    
+    return 0
+}
+
+# Function to get cached metadata
+get_cached_metadata() {
+    local db_path=$(get_cache_db_path)
+    local file_path="$1"
+    
+    if [ ! -f "$db_path" ]; then
+        return 1
+    fi
+    
+    # Get cached metadata
+    local cached_metadata=$(sqlite3 "$db_path" "SELECT metadata_json FROM metadata WHERE file_path='$file_path';" 2>/dev/null)
+    if [ -n "$cached_metadata" ]; then
+        echo "$cached_metadata"
+        return 0
+    fi
+    
+    return 1
+}
+
+# Function to get cached modified time
+get_cached_modified_time() {
+    local db_path=$(get_cache_db_path)
+    local file_path="$1"
+    
+    if [ ! -f "$db_path" ]; then
+        return 1
+    fi
+    
+    # Get cached modified time
+    local cached_time=$(sqlite3 "$db_path" "SELECT modified_time FROM file_info WHERE file_path='$file_path';" 2>/dev/null)
+    if [ -n "$cached_time" ]; then
+        echo "$cached_time"
+        return 0
+    fi
+    
+    return 1
+}
+
+# Function to invalidate cache entry
+invalidate_cache_entry() {
+    local db_path=$(get_cache_db_path)
+    local file_path="$1"
+    
+    if [ ! -f "$db_path" ]; then
+        return 1
+    fi
+    
+    # Delete cache entries for this file
+    sqlite3 "$db_path" "DELETE FROM metadata WHERE file_path='$file_path';" 2>/dev/null
+    sqlite3 "$db_path" "DELETE FROM file_info WHERE file_path='$file_path';" 2>/dev/null
+}
+
+# Function to store file info in cache
+store_file_info() {
+    local db_path=$(get_cache_db_path)
+    local file_path="$1"
+    local file_size="$2"
+    local file_hash="$3"
+    local modified_time="$4"
+    local file_type="$5"
+    
+    if [ ! -f "$db_path" ]; then
+        return 1
+    fi
+    
+    # Store file info
+    sqlite3 "$db_path" << EOF
+INSERT OR REPLACE INTO file_info (file_path, file_size, file_hash, modified_time, file_type, updated_at)
+VALUES ('$file_path', '$file_size', '$file_hash', '$modified_time', '$file_type', datetime('now'));
+EOF
 }
 
 # Function to search in video metadata
@@ -599,8 +1015,33 @@ search_video_metadata() {
         grep_options="$grep_options -i"
     fi
     
-    # Extract all metadata as a single string
-    local metadata_full="$(ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null)"
+    # Check cache first if enabled
+    local metadata_full=""
+    if [ "$CACHE_ENABLED" = true ]; then
+        if is_file_cached "$file"; then
+            # Check if file has been modified since caching
+            local cached_modified_time=$(get_cached_modified_time "$file")
+            local current_modified_time=$(stat -f%m "$file" 2>/dev/null || stat -c%Y "$file" 2>/dev/null || echo "")
+            
+            if [ "$cached_modified_time" != "$current_modified_time" ]; then
+                # File has been modified, invalidate cache
+                invalidate_cache_entry "$file"
+                echo "Cache invalidated: $file (file modified)"
+            else
+                metadata_full=$(get_cached_metadata "$file")
+                if [ -n "$metadata_full" ]; then
+                    if [ "$VERBOSE" = true ]; then
+                        echo -e "${BLUE}Using cached metadata for: $file${NC}"
+                    fi
+                fi
+            fi
+        fi
+    fi
+    
+    # If not cached or cache disabled, extract metadata
+    if [ -z "$metadata_full" ]; then
+        metadata_full="$(ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null)"
+    fi
 
     if [ ${#AND_TERMS[@]} -gt 0 ] || [ ${#OR_TERMS[@]} -gt 0 ] || [ ${#NOT_TERMS[@]} -gt 0 ]; then
         if matches_advanced_search "$metadata_full"; then
@@ -711,7 +1152,19 @@ search_video_metadata() {
             echo
         fi
     fi
-    
+
+    # Store in cache if enabled and not already cached
+    if [ "$found" = true ] && [ "$CACHE_ENABLED" = true ]; then
+        if ! is_file_cached "$file"; then
+            local file_size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "0")
+            local file_hash=$(sha256sum "$file" 2>/dev/null | cut -d' ' -f1 || echo "")
+            local modified_time=$(stat -f%m "$file" 2>/dev/null || stat -c%Y "$file" 2>/dev/null || echo "")
+            local file_type=$(echo "$file" | sed 's/.*\.//' | tr '[:upper:]' '[:lower:]')
+            store_metadata_in_cache "$file" "$metadata_full"
+            store_file_info "$file" "$file_size" "$file_hash" "$modified_time" "$file_type"
+        fi
+    fi
+
     [ "$found" = true ]
 }
 
@@ -1595,6 +2048,50 @@ main() {
                 PERFORMANCE_REPORT=true
                 shift
                 ;;
+            --cache-init)
+                CACHE_INIT=true
+                shift
+                ;;
+            --cache-store)
+                CACHE_STORE=true
+                shift
+                ;;
+            --cache-retrieve)
+                CACHE_RETRIEVE=true
+                shift
+                ;;
+            --cache-status)
+                CACHE_STATUS=true
+                shift
+                ;;
+            --cache-clear)
+                CACHE_CLEAR=true
+                shift
+                ;;
+            --cache-migrate)
+                CACHE_MIGRATE=true
+                shift
+                ;;
+            --cache-backup)
+                CACHE_BACKUP="$2"
+                shift 2
+                ;;
+            --cache-restore)
+                CACHE_RESTORE="$2"
+                shift 2
+                ;;
+            --cache-size-limit)
+                CACHE_SIZE_LIMIT="$2"
+                shift 2
+                ;;
+            --cache-compress)
+                CACHE_COMPRESS=true
+                shift
+                ;;
+            --cache-enabled)
+                CACHE_ENABLED=true
+                shift
+                ;;
             -h|--help)
                 print_usage
                 exit 0
@@ -1620,19 +2117,19 @@ main() {
     fi
 
     # Check if we have the required arguments
-    if [ -z "$search_string" ] && [ "$SHOW_FIELD_LIST" = false ] && [ ${#AND_TERMS[@]} -eq 0 ] && [ ${#OR_TERMS[@]} -eq 0 ] && [ ${#NOT_TERMS[@]} -eq 0 ]; then
+    if [ -z "$search_string" ] && [ "$SHOW_FIELD_LIST" = false ] && [ ${#AND_TERMS[@]} -eq 0 ] && [ ${#OR_TERMS[@]} -eq 0 ] && [ ${#NOT_TERMS[@]} -eq 0 ] && [ "$CACHE_INIT" = false ] && [ "$CACHE_STATUS" = false ] && [ "$CACHE_CLEAR" = false ] && [ -z "$CACHE_BACKUP" ] && [ -z "$CACHE_RESTORE" ] && [ "$CACHE_MIGRATE" = false ]; then
         echo -e "${RED}Error: Missing required search string or advanced search terms${NC}"
         print_usage
         exit 1
     fi
-    if [ -z "$directory" ]; then
+    if [ -z "$directory" ] && [ "$CACHE_INIT" = false ] && [ "$CACHE_STATUS" = false ] && [ "$CACHE_CLEAR" = false ] && [ -z "$CACHE_BACKUP" ] && [ -z "$CACHE_RESTORE" ] && [ "$CACHE_MIGRATE" = false ]; then
         echo -e "${RED}Error: Missing required directory argument${NC}"
         print_usage
         exit 1
     fi
 
-    # Check if directory exists
-    if [ ! -d "$directory" ]; then
+    # Check if directory exists (skip for cache operations)
+    if [ -n "$directory" ] && [ ! -d "$directory" ] && [ "$CACHE_INIT" = false ] && [ "$CACHE_STATUS" = false ] && [ "$CACHE_CLEAR" = false ] && [ -z "$CACHE_BACKUP" ] && [ -z "$CACHE_RESTORE" ] && [ "$CACHE_MIGRATE" = false ]; then
         echo -e "${RED}Error: Directory '$directory' does not exist${NC}"
         exit 1
     fi
@@ -1650,6 +2147,73 @@ main() {
 
     # Check dependencies
     check_dependencies
+    
+    # Handle cache operations
+    if [ "$CACHE_INIT" = true ]; then
+        init_cache_database
+        exit 0
+    fi
+    
+    if [ "$CACHE_STATUS" = true ]; then
+        check_cache_status
+        exit 0
+    fi
+    
+    if [ "$CACHE_CLEAR" = true ]; then
+        clear_cache
+        exit 0
+    fi
+    
+    if [ -n "$CACHE_BACKUP" ]; then
+        backup_cache "$CACHE_BACKUP"
+        exit 0
+    fi
+    
+    if [ -n "$CACHE_RESTORE" ]; then
+        restore_cache "$CACHE_RESTORE"
+        exit 0
+    fi
+    
+    if [ "$CACHE_MIGRATE" = true ]; then
+        migrate_cache_database
+        exit 0
+    fi
+    
+    if [ "$CACHE_STORE" = true ]; then
+        # Store metadata for all files in directory
+        find "$directory" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" -o -iname "*.bmp" -o -iname "*.tiff" -o -iname "*.tif" -o -iname "*.webp" -o -iname "*.heic" -o -iname "*.heif" -o -iname "*.mp4" -o -iname "*.avi" -o -iname "*.mov" -o -iname "*.mkv" -o -iname "*.wmv" -o -iname "*.flv" -o -iname "*.webm" -o -iname "*.m4v" -o -iname "*.3gp" -o -iname "*.mpg" -o -iname "*.mpeg" \) | while read -r file; do
+            if [ -f "$file" ]; then
+                local metadata=$(exiftool "$file" 2>/dev/null)
+                if [ -n "$metadata" ]; then
+                    store_metadata_in_cache "$file" "$metadata"
+                fi
+            fi
+        done
+        exit 0
+    fi
+    
+    if [ "$CACHE_RETRIEVE" = true ]; then
+        # Search within cached metadata
+        local found_in_cache=false
+        find "$directory" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" -o -iname "*.bmp" -o -iname "*.tiff" -o -iname "*.tif" -o -iname "*.webp" -o -iname "*.heic" -o -iname "*.heif" -o -iname "*.mp4" -o -iname "*.avi" -o -iname "*.mov" -o -iname "*.mkv" -o -iname "*.wmv" -o -iname "*.flv" -o -iname "*.webm" -o -iname "*.m4v" -o -iname "*.3gp" -o -iname "*.mpg" -o -iname "*.mpeg" \) | while read -r file; do
+            if [ -f "$file" ]; then
+                local cached_metadata=$(retrieve_metadata_from_cache "$file")
+                if [ -n "$cached_metadata" ]; then
+                    # Search within cached metadata
+                    if echo "$cached_metadata" | grep -qi "$search_string"; then
+                        echo "Cache hit: $file"
+                        echo "$cached_metadata"
+                        found_in_cache=true
+                    fi
+                fi
+            fi
+        done
+        
+        if [ "$found_in_cache" = false ]; then
+            echo "Cache miss: No matches found for '$search_string' in cached metadata"
+        fi
+        exit 0
+    fi
 
     # Note: Case sensitivity is now handled in the search functions
 

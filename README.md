@@ -25,7 +25,7 @@ A comprehensive suite of command-line tools for searching and analyzing metadata
 - **Device statistics** - comprehensive breakdown of devices used
 - **OS version detection** - identify operating system versions
 
-### Parallel Processing & Performance 🆕
+### Parallel Processing & Performance ✅
 - **Parallel processing** with configurable worker pools (2-8x faster)
 - **Auto-detect optimal workers** based on CPU cores
 - **Memory management** with configurable limits
@@ -34,6 +34,16 @@ A comprehensive suite of command-line tools for searching and analyzing metadata
 - **Performance benchmarking** and comparison tools
 - **Memory usage monitoring** during processing
 - **Performance reporting** with detailed metrics
+
+### Metadata Caching 🆕
+- **Intelligent caching** - Cache metadata for repeated searches
+- **Cache invalidation** - Automatic cache refresh when files change
+- **Cache management** - Initialize, clear, backup, and restore cache
+- **Cache performance** - Significant speed improvements for repeated operations
+- **Cache statistics** - Monitor cache hit rates and performance
+- **Cache compression** - Reduce storage requirements
+- **Cache size limits** - Prevent cache from growing too large
+- **Cache-enabled search** - Use cached metadata for faster searches
 
 ### Output Formats
 - **Text output** with detailed metadata display
@@ -156,7 +166,7 @@ chmod +x search_metadata.sh generate_media_report.sh
 ./search_metadata.sh "Canon" /path/to/photos --json -o results.json
 ```
 
-### Parallel Processing Examples 🆕
+### Parallel Processing Examples ✅
 ```bash
 # Fast processing of large directory
 ./search_metadata.sh "test" /large/photo/collection --parallel 8
@@ -172,6 +182,30 @@ chmod +x search_metadata.sh generate_media_report.sh
 
 # Compare sequential vs parallel performance
 ./search_metadata.sh "test" /path/to/photos --compare-modes
+```
+
+### Caching Examples 🆕
+```bash
+# Initialize cache for faster searches
+./search_metadata.sh "test" /path/to/photos --cache-init
+
+# Store metadata in cache
+./search_metadata.sh "test" /path/to/photos --cache-store
+
+# Search with cache enabled (much faster)
+./search_metadata.sh "Canon" /path/to/photos --cache-enabled
+
+# Check cache status
+./search_metadata.sh "test" /path/to/photos --cache-status
+
+# Clear cache
+./search_metadata.sh "test" /path/to/photos --cache-clear
+
+# Backup cache
+./search_metadata.sh "test" /path/to/photos --cache-backup backup.db
+
+# Restore cache
+./search_metadata.sh "test" /path/to/photos --cache-restore backup.db
 ```
 
 ### Report Examples
