@@ -13,6 +13,7 @@ source "$SCRIPT_DIR/lib/caching.sh"
 source "$SCRIPT_DIR/lib/parallel_processing.sh"
 source "$SCRIPT_DIR/lib/file_validation.sh"
 source "$SCRIPT_DIR/lib/gps_utils.sh"
+source "$SCRIPT_DIR/lib/file_operations.sh"
 
 # Colors for output
 RED='\033[0;31m'

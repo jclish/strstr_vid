@@ -9,6 +9,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/metadata_extraction.sh"
 source "$SCRIPT_DIR/lib/output_formatters.sh"
+source "$SCRIPT_DIR/lib/file_operations.sh"
+source "$SCRIPT_DIR/lib/file_validation.sh"
+source "$SCRIPT_DIR/lib/parallel_processing.sh"
+source "$SCRIPT_DIR/lib/caching.sh"
+source "$SCRIPT_DIR/lib/gps_utils.sh"
 
 # Colors for output
 RED='\033[0;31m'
