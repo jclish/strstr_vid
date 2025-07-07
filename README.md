@@ -418,6 +418,25 @@ File Path,File Type,Search String,Search Field,Match Type,File Size,Last Modifie
 /path/to/photo.jpg,image,Canon,Make,exact,2048576,2023-06-15 14:30:25,37.7749,-122.4194,0.0,Camera,EOS R5,
 ```
 
+## 📍 GPS Coordinate Support
+
+This tool supports both decimal degrees and DMS (degrees, minutes, seconds) formats for GPS coordinates in all location-based search features.
+
+**Examples:**
+
+- Decimal degrees: `--within-radius "37.7749,-122.4194,10"`
+- DMS: `--within-radius "37°46'29.6\"N,-122°25'9.8\"W,5"`
+- Bounding box (decimal): `--bounding-box "37.7,37.8,-122.5,-122.4"`
+
+All GPS coordinate parsing, conversion, and distance calculations are handled by a robust shared library (`lib/gps_utils.sh`).
+
+**Edge cases handled:**
+- Southern and western hemisphere (negative/"S"/"W" values)
+- Zero and invalid coordinates (graceful handling)
+- Mixed input formats (decimal or DMS)
+
+See `examples/caching_examples.md` and `examples/incremental_examples.md` for more usage patterns.
+
 ## 🤝 Contributing
 
 1. Fork the repository
