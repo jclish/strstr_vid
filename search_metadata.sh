@@ -5,6 +5,11 @@
 
 set -e
 
+# Source shared libraries
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/metadata_extraction.sh"
+source "$SCRIPT_DIR/lib/output_formatters.sh"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -264,36 +269,7 @@ Requirements:
 EOF
 }
 
-# Function to check if a command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
-
-# Function to check dependencies
-check_dependencies() {
-    local missing_deps=()
-    
-    if ! command_exists exiftool; then
-        missing_deps+=("exiftool")
-    fi
-    
-    if ! command_exists ffprobe; then
-        missing_deps+=("ffprobe")
-    fi
-    
-    if [ ${#missing_deps[@]} -ne 0 ]; then
-        echo -e "${RED}Error: Missing required dependencies:${NC}"
-        for dep in "${missing_deps[@]}"; do
-            echo -e "  - ${YELLOW}$dep${NC}"
-        done
-        echo
-        echo "Install instructions:"
-        echo "  macOS: brew install exiftool ffmpeg"
-        echo "  Ubuntu/Debian: sudo apt-get install exiftool ffmpeg"
-        echo "  CentOS/RHEL: sudo yum install perl-Image-ExifTool ffmpeg"
-        exit 1
-    fi
-}
+# Dependencies are now handled by lib/metadata_extraction.sh
 
 # Function to escape CSV values
 escape_csv() {
@@ -359,100 +335,7 @@ generate_csv_output() {
     done
 }
 
-# Helper: Extract GPS from exiftool output
-extract_gps_from_exiftool() {
-    local file="$1"
-    local lat=""
-    local lon=""
-    local gps_data
-    gps_data=$(exiftool -c '%.8f' -GPSLatitude -GPSLongitude "$file" 2>/dev/null)
-    lat=$(echo "$gps_data" | awk -F': ' '/GPS Latitude/ {print $2}' | head -1)
-    lon=$(echo "$gps_data" | awk -F': ' '/GPS Longitude/ {print $2}' | head -1)
-    
-    # Handle longitude with direction suffix (W/E)
-    if [[ "$lon" =~ W$ ]]; then
-        lon="-${lon% W}"
-    elif [[ "$lon" =~ E$ ]]; then
-        lon="${lon% E}"
-    fi
-    
-    echo "$lat|$lon"
-}
-
-# Helper: Extract GPS from ffprobe output (if present)
-extract_gps_from_ffprobe() {
-    local file="$1"
-    local lat=""
-    local lon=""
-    local ffprobe_json
-    ffprobe_json=$(ffprobe -v quiet -print_format json -show_format -show_streams "$file" 2>/dev/null)
-    lat=$(echo "$ffprobe_json" | grep -E 'location|latitude' | grep -o '[-0-9.]*' | head -1)
-    lon=$(echo "$ffprobe_json" | grep -E 'location|longitude' | grep -o '[-0-9.]*' | tail -1)
-    echo "$lat|$lon"
-}
-
-# Function to convert DMS to decimal degrees
-dms_to_decimal() {
-    local dms="$1"
-    
-    # If it's already a decimal number, return it
-    if [[ "$dms" =~ ^-?[0-9]+\.?[0-9]*$ ]]; then
-        echo "$dms"
-        return
-    fi
-    
-    # For DMS format, we'll use a simpler approach
-    # For now, just return the input if it's not a simple decimal
-    # This avoids the complex regex that's causing issues
-    echo "$dms"
-}
-
-# Function to calculate distance between two GPS coordinates (Haversine formula)
-calculate_distance() {
-    local lat1="$1"
-    local lon1="$2"
-    local lat2="$3"
-    local lon2="$4"
-    
-    # Convert to radians
-    local pi=3.14159265359
-    local lat1_rad=$(echo "scale=10; $lat1 * $pi / 180" | bc -l)
-    local lon1_rad=$(echo "scale=10; $lon1 * $pi / 180" | bc -l)
-    local lat2_rad=$(echo "scale=10; $lat2 * $pi / 180" | bc -l)
-    local lon2_rad=$(echo "scale=10; $lon2 * $pi / 180" | bc -l)
-    
-    # Haversine formula
-    local dlat=$(echo "scale=10; $lat2_rad - $lat1_rad" | bc -l)
-    local dlon=$(echo "scale=10; $lon2_rad - $lon1_rad" | bc -l)
-    local a=$(echo "scale=10; s($dlat/2)^2 + c($lat1_rad) * c($lat2_rad) * s($dlon/2)^2" | bc -l)
-    local c=$(echo "scale=10; 2 * a(sqrt($a))" | bc -l)
-    local distance=$(echo "scale=2; 6371 * $c" | bc -l) # Earth radius in km
-    
-    echo "$distance"
-}
-
-# Function to check if coordinates are within radius
-is_within_radius() {
-    local file_lat="$1"
-    local file_lon="$2"
-    local center_lat="$3"
-    local center_lon="$4"
-    local radius_km="$5"
-    
-    if [ -z "$file_lat" ] || [ -z "$file_lon" ]; then
-        echo ""
-        return
-    fi
-    
-    local distance=$(calculate_distance "$file_lat" "$file_lon" "$center_lat" "$center_lon")
-    local within_radius=$(echo "$distance <= $radius_km" | bc -l | tr -d '\n')
-    
-    if [ "$within_radius" = "1" ]; then
-        echo "$distance"
-    else
-        echo ""
-    fi
-}
+# GPS and metadata extraction functions are now handled by lib/metadata_extraction.sh
 
 # Function to check if coordinates are within bounding box
 is_within_bounding_box() {

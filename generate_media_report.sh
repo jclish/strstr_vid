@@ -5,6 +5,11 @@
 
 set -e
 
+# Source shared libraries
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/metadata_extraction.sh"
+source "$SCRIPT_DIR/lib/output_formatters.sh"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -88,80 +93,9 @@ Requirements:
 EOF
 }
 
-# Function to check if a command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
+# Dependencies are now handled by lib/metadata_extraction.sh
 
-# Function to check dependencies
-check_dependencies() {
-    local missing_deps=()
-    
-    if ! command_exists exiftool; then
-        missing_deps+=("exiftool")
-    fi
-    
-    if ! command_exists ffprobe; then
-        missing_deps+=("ffprobe")
-    fi
-    
-    if [ ${#missing_deps[@]} -ne 0 ]; then
-        echo -e "${RED}Error: Missing required dependencies:${NC}"
-        for dep in "${missing_deps[@]}"; do
-            echo -e "  - ${YELLOW}$dep${NC}"
-        done
-        echo
-        echo "Install instructions:"
-        echo "  macOS: brew install exiftool ffmpeg"
-        echo "  Ubuntu/Debian: sudo apt-get install exiftool ffmpeg"
-        echo "  CentOS/RHEL: sudo yum install perl-Image-ExifTool ffmpeg"
-        exit 1
-    fi
-}
-
-# Function to generate JSON report
-generate_json_report() {
-    local dir="$1"
-    local count="$2"
-    local images="$3"
-    local videos="$4"
-    local total_size="$5"
-    
-    cat << EOF
-{
-  "directory": "$dir",
-  "generated_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "summary": {
-    "total_files": $count,
-    "total_size": $total_size,
-    "images": $images,
-    "videos": $videos,
-    "other": $((count - images - videos))
-  }
-}
-EOF
-}
-
-# Function to escape CSV values
-escape_csv_value() {
-    local value="$1"
-    # Replace double quotes with two double quotes
-    value="${value//\"/\"\"}"
-    # If value contains comma, newline, or double quote, wrap in quotes
-    if [[ "$value" =~ [,\"\n\r] ]]; then
-        value="\"$value\""
-    fi
-    echo "$value"
-}
-
-# Function to extract metadata field
-extract_metadata_field() {
-    local metadata="$1"
-    local field="$2"
-    # Use grep and sed for more flexible field matching
-    local value=$(echo "$metadata" | LC_ALL=C grep -E "^[[:space:]]*$field[[:space:]]*:" | sed 's/^[[:space:]]*[^:]*:[[:space:]]*//' | head -1)
-    echo "$value"
-}
+# JSON and CSV functions are now handled by lib/output_formatters.sh
 
 # Function to generate CSV report
 generate_csv_report() {
