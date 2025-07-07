@@ -11,9 +11,6 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}=== Metadata Search Tool - Dependency Installer ===${NC}"
-echo
-
 # Function to detect OS
 detect_os() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -45,7 +42,7 @@ install_macos() {
     if ! command_exists brew; then
         echo -e "${RED}Homebrew not found. Please install Homebrew first:${NC}"
         echo "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-        exit 1
+        return 1
     fi
     
     echo -e "${YELLOW}Installing dependencies via Homebrew...${NC}"
@@ -166,7 +163,7 @@ verify_installation() {
         echo
         echo -e "${RED}=== Installation Failed ===${NC}"
         echo "Please check the error messages above and try again."
-        exit 1
+        return 1
     fi
 }
 
@@ -199,5 +196,9 @@ main() {
     verify_installation
 }
 
-# Run main function
-main "$@" 
+# Only run main if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    echo -e "${BLUE}=== Metadata Search Tool - Dependency Installer ===${NC}"
+    echo
+    main "$@"
+fi 

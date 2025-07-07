@@ -169,3 +169,6 @@ strstr_vid/
 - **Consistency**: Unified behavior across all tools
 - **Testability**: Isolated functions for better testing
 - **Extensibility**: Easy to add new features to shared libraries 
+
+- [x] Make install_dependencies.sh robust, testable, and isolated from system environment
+- [x] Create comprehensive BATS test suite for install_dependencies.sh (all tests green) 

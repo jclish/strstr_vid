@@ -113,33 +113,13 @@ A comprehensive suite of command-line tools for searching and analyzing metadata
 
 ## 📦 Installation
 
-### Prerequisites
-- **exiftool** - for image metadata extraction
-- **ffprobe** (part of ffmpeg) - for video metadata extraction
+Run the install script to install all dependencies:
 
-### Install Dependencies
-
-**macOS:**
-```bash
-brew install exiftool ffmpeg
+```sh
+./install_dependencies.sh
 ```
 
-**Ubuntu/Debian:**
-```bash
-sudo apt-get install exiftool ffmpeg
-```
-
-**CentOS/RHEL:**
-```bash
-sudo yum install perl-Image-ExifTool ffmpeg
-```
-
-### Download and Setup
-```bash
-git clone https://github.com/yourusername/media-metadata-tools.git
-cd media-metadata-tools
-chmod +x search_metadata.sh generate_media_report.sh
-```
+This script is robust, fully tested, and works on macOS, Ubuntu/Debian, CentOS, and Fedora. It will not interfere with your system if sourced for testing.
 
 ## 🎯 Quick Start
 
@@ -365,19 +345,14 @@ chmod +x search_metadata.sh generate_media_report.sh
 
 ## 🧪 Testing
 
-Run the comprehensive test suite:
-```bash
-# Install BATS testing framework
-npm install -g bats
+To run all tests (including install script tests):
 
-# Run all tests
-./run_tests.sh
-
-# Run specific test categories
-bats tests/test_basic.bats
-bats tests/test_advanced.bats
-bats tests/test_performance_parallel.bats
+```sh
+cd tests
+bats test_install_dependencies.bats
 ```
+
+All tests are isolated from your real system environment for reliability.
 
 ## 📝 Output Formats
 
