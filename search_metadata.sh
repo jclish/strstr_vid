@@ -10,6 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/metadata_extraction.sh"
 source "$SCRIPT_DIR/lib/output_formatters.sh"
 source "$SCRIPT_DIR/lib/caching.sh"
+source "$SCRIPT_DIR/lib/parallel_processing.sh"
 
 # Colors for output
 RED='\033[0;31m'
@@ -587,59 +588,7 @@ search_image_metadata() {
     [ "$found" = true ]
 }
 
-# Function to get memory usage in MB
-get_memory_usage() {
-    if command_exists ps; then
-        local pid=$$
-        local memory_kb=$(ps -o rss= -p "$pid" 2>/dev/null | tr -d ' ')
-        if [ -n "$memory_kb" ]; then
-            echo "scale=2; $memory_kb / 1024" | bc -l 2>/dev/null || echo "0"
-        else
-            echo "0"
-        fi
-    else
-        echo "0"
-    fi
-}
-
-# Function to format memory size
-format_memory_size() {
-    local size="$1"
-    if [ "$size" -ge 1024 ]; then
-        echo "scale=1; $size / 1024" | bc -l 2>/dev/null | sed 's/\.0$//' | sed 's/$/GB/'
-    else
-        echo "${size}MB"
-    fi
-}
-
-# Function to parse memory limit
-parse_memory_limit() {
-    local limit="$1"
-    if [[ "$limit" =~ ^([0-9]+)(MB|GB)$ ]]; then
-        local size="${BASH_REMATCH[1]}"
-        local unit="${BASH_REMATCH[2]}"
-        if [ "$unit" = "GB" ]; then
-            echo $((size * 1024 * 1024 * 1024))
-        else
-            echo $((size * 1024 * 1024))
-        fi
-    else
-        echo "0"
-    fi
-}
-
-# Function to check memory limit
-check_memory_limit() {
-    if [ -n "$MEMORY_LIMIT" ]; then
-        local current_mb=$(get_memory_usage)
-        local limit_mb=$(parse_memory_limit "$MEMORY_LIMIT")
-        if [ "$current_mb" -gt "$limit_mb" ]; then
-            echo -e "${YELLOW}Warning: Memory usage (${current_mb}MB) exceeds limit (${limit_mb}MB)${NC}"
-            return 1
-        fi
-    fi
-    return 0
-}
+# Memory and parallel processing functions are now in lib/parallel_processing.sh
 
 # Function to get cache database path
 get_cache_db_path() {
