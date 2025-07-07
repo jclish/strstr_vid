@@ -11,6 +11,8 @@ source "$SCRIPT_DIR/lib/metadata_extraction.sh"
 source "$SCRIPT_DIR/lib/output_formatters.sh"
 source "$SCRIPT_DIR/lib/caching.sh"
 source "$SCRIPT_DIR/lib/parallel_processing.sh"
+source "$SCRIPT_DIR/lib/file_validation.sh"
+source "$SCRIPT_DIR/lib/gps_utils.sh"
 
 # Colors for output
 RED='\033[0;31m'
@@ -2394,10 +2396,7 @@ AND_TERMS=(${AND_TERMS[@]})
 OR_TERMS=(${OR_TERMS[@]})
 NOT_TERMS=(${NOT_TERMS[@]})
 
-# Function to check if a command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
+# File validation functions are now in lib/file_validation.sh
 
 # Function to search in image metadata
 search_image_metadata() {
