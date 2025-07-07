@@ -9,6 +9,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/metadata_extraction.sh"
 source "$SCRIPT_DIR/lib/output_formatters.sh"
+source "$SCRIPT_DIR/lib/caching.sh"
 
 # Colors for output
 RED='\033[0;31m'
@@ -814,10 +815,13 @@ store_metadata_in_cache() {
     local modified_time=$(stat -f%m "$file_path" 2>/dev/null || stat -c%Y "$file_path" 2>/dev/null || echo "")
     local file_type=$(echo "$file_path" | sed 's/.*\.//' | tr '[:upper:]' '[:lower:]')
     
+    # Base64 encode metadata to avoid SQL issues
+    local metadata_b64=$(echo "$metadata_json" | base64 | tr -d '\n')
+    
     # Store in database
     sqlite3 "$db_path" << EOF
 INSERT OR REPLACE INTO metadata (file_path, file_hash, metadata_json, updated_at)
-VALUES ('$file_path', '$file_hash', '$metadata_json', datetime('now'));
+VALUES ('$file_path', '$file_hash', '$metadata_b64', datetime('now'));
 EOF
     
     # Store file info
@@ -841,7 +845,8 @@ retrieve_metadata_from_cache() {
     
     if [ -n "$cached_data" ]; then
         echo -e "${GREEN}Cache hit: $file_path${NC}"
-        echo "$cached_data"
+        # Decode base64 metadata
+        echo "$cached_data" | base64 --decode
         return 0
     else
         echo -e "${YELLOW}Cache miss: $file_path${NC}"
@@ -934,7 +939,8 @@ get_cached_metadata() {
     # Get cached metadata
     local cached_metadata=$(sqlite3 "$db_path" "SELECT metadata_json FROM metadata WHERE file_path='$file_path';" 2>/dev/null)
     if [ -n "$cached_metadata" ]; then
-        echo "$cached_metadata"
+        # Decode base64 metadata
+        echo "$cached_metadata" | base64 --decode
         return 0
     fi
     
