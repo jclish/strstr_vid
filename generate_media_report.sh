@@ -1610,6 +1610,11 @@ main() {
     # Check dependencies
     check_dependencies
 
+    # Validate directory path
+    if [ -n "$directory" ] && ! validate_directory_path "$directory"; then
+        exit 1
+    fi
+
     # Disable 'set -e' before main processing to avoid exit on non-critical errors
     set +e  # Allow nonzero exit codes in file processing; we want to process as many files as possible
 

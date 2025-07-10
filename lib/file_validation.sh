@@ -445,3 +445,60 @@ init_colors() {
         NC=''
     fi
 } 
+
+# Function to validate and sanitize file paths
+validate_file_path() {
+    local path="$1"
+    
+    # Check for null bytes using printf and grep
+    if printf '%s' "$path" | grep -q $'\0'; then
+        echo "Error: Path contains null bytes" >&2
+        return 1
+    fi
+    
+    # Check for shell metacharacters using grep for compatibility
+    if echo "$path" | grep -q '[;&|`$()]'; then
+        echo "Error: Path contains shell metacharacters" >&2
+        return 1
+    fi
+    
+    return 0
+}
+
+# Function to sanitize search strings
+validate_search_string() {
+    local search_string="$1"
+    
+    # Check for null bytes using LC_ALL=C grep for binary safety
+    if printf '%s' "$search_string" | LC_ALL=C grep -q '\x00'; then
+        echo "Error: Search string contains null bytes" >&2
+        return 1
+    fi
+    
+    # Check for excessive length
+    if [ ${#search_string} -gt 1000 ]; then
+        echo "Error: Search string too long" >&2
+        return 1
+    fi
+    
+    return 0
+} 
+
+# Function to validate and sanitize directory paths
+validate_directory_path() {
+    local directory="$1"
+    
+    # Check for null bytes using printf and grep
+    if printf '%s' "$directory" | LC_ALL=C grep -q '\x00'; then
+        echo "Error: Directory path contains null bytes" >&2
+        return 1
+    fi
+    
+    # Check for shell metacharacters using grep for compatibility
+    if echo "$directory" | grep -q '[;&|`$()]'; then
+        echo "Error: Directory path contains shell metacharacters" >&2
+        return 1
+    fi
+    
+    return 0
+} 

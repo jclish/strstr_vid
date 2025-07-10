@@ -10,26 +10,30 @@ find_media_files() {
     local images_only="${3:-false}"
     local videos_only="${4:-false}"
     
-    local find_cmd="find \"$directory\" -type f"
+    # Validate directory path to prevent command injection
+    if echo "$directory" | grep -q '[;&|`$()]'; then
+        echo "Error: Invalid directory path" >&2
+        return 1
+    fi
+    
+    # Build find command safely
+    local find_args=("$directory" "-type" "f")
     
     if [ "$recursive" = false ]; then
-        find_cmd="$find_cmd -maxdepth 1"
+        find_args+=("-maxdepth" "1")
     fi
     
     # Build file type filter
-    local file_types=""
     if [ "$images_only" = true ]; then
-        file_types="\( -iname \"*.jpg\" -o -iname \"*.jpeg\" -o -iname \"*.png\" -o -iname \"*.gif\" -o -iname \"*.bmp\" -o -iname \"*.tiff\" -o -iname \"*.tif\" -o -iname \"*.webp\" -o -iname \"*.heic\" -o -iname \"*.heif\" \)"
+        find_args+=("(" "-iname" "*.jpg" "-o" "-iname" "*.jpeg" "-o" "-iname" "*.png" "-o" "-iname" "*.gif" "-o" "-iname" "*.bmp" "-o" "-iname" "*.tiff" "-o" "-iname" "*.tif" "-o" "-iname" "*.webp" "-o" "-iname" "*.heic" "-o" "-iname" "*.heif" ")")
     elif [ "$videos_only" = true ]; then
-        file_types="\( -iname \"*.mp4\" -o -iname \"*.avi\" -o -iname \"*.mov\" -o -iname \"*.mkv\" -o -iname \"*.wmv\" -o -iname \"*.flv\" -o -iname \"*.webm\" -o -iname \"*.m4v\" -o -iname \"*.3gp\" -o -iname \"*.mpg\" -o -iname \"*.mpeg\" \)"
+        find_args+=("(" "-iname" "*.mp4" "-o" "-iname" "*.avi" "-o" "-iname" "*.mov" "-o" "-iname" "*.mkv" "-o" "-iname" "*.wmv" "-o" "-iname" "*.flv" "-o" "-iname" "*.webm" "-o" "-iname" "*.m4v" "-o" "-iname" "*.3gp" "-o" "-iname" "*.mpg" "-o" "-iname" "*.mpeg" ")")
     else
-        file_types="\( -iname \"*.jpg\" -o -iname \"*.jpeg\" -o -iname \"*.png\" -o -iname \"*.gif\" -o -iname \"*.bmp\" -o -iname \"*.tiff\" -o -iname \"*.tif\" -o -iname \"*.webp\" -o -iname \"*.heic\" -o -iname \"*.heif\" -o -iname \"*.mp4\" -o -iname \"*.avi\" -o -iname \"*.mov\" -o -iname \"*.mkv\" -o -iname \"*.wmv\" -o -iname \"*.flv\" -o -iname \"*.webm\" -o -iname \"*.m4v\" -o -iname \"*.3gp\" -o -iname \"*.mpg\" -o -iname \"*.mpeg\" \)"
+        find_args+=("(" "-iname" "*.jpg" "-o" "-iname" "*.jpeg" "-o" "-iname" "*.png" "-o" "-iname" "*.gif" "-o" "-iname" "*.bmp" "-o" "-iname" "*.tiff" "-o" "-iname" "*.tif" "-o" "-iname" "*.webp" "-o" "-iname" "*.heic" "-o" "-iname" "*.heif" "-o" "-iname" "*.mp4" "-o" "-iname" "*.avi" "-o" "-iname" "*.mov" "-o" "-iname" "*.mkv" "-o" "-iname" "*.wmv" "-o" "-iname" "*.flv" "-o" "-iname" "*.webm" "-o" "-iname" "*.m4v" "-o" "-iname" "*.3gp" "-o" "-iname" "*.mpg" "-o" "-iname" "*.mpeg" ")")
     fi
     
-    find_cmd="$find_cmd $file_types"
-    
-    # Execute find command
-    eval "$find_cmd" 2>/dev/null
+    # Execute find command safely
+    find "${find_args[@]}" 2>/dev/null
 }
 
 # Function to count media files in directory
@@ -80,7 +84,10 @@ create_temp_file_list() {
     local images_only="${3:-false}"
     local videos_only="${4:-false}"
     
+    # Create temporary file with proper cleanup
     local temp_file=$(mktemp)
+    trap 'rm -f "$temp_file"' EXIT
+    
     find_media_files "$directory" "$recursive" "$images_only" "$videos_only" > "$temp_file"
     echo "$temp_file"
 }

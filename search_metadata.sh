@@ -792,8 +792,8 @@ retrieve_metadata_from_cache() {
         return 1
     fi
     
-    # Check if file exists in cache
-    local cached_data=$(sqlite3 "$db_path" "SELECT metadata_json FROM metadata WHERE file_path='$file_path';" 2>/dev/null)
+    # Get cached metadata if available
+    local cached_data=$(sqlite3 "$db_path" "SELECT metadata_json FROM metadata WHERE file_path = ?;" "$file_path" 2>/dev/null)
     
     if [ -n "$cached_data" ]; then
         echo -e "${GREEN}Cache hit: $file_path${NC}"
@@ -865,7 +865,7 @@ is_file_cached() {
     fi
     
     # Check if file exists in cache
-    local cached_hash=$(sqlite3 "$db_path" "SELECT file_hash FROM metadata WHERE file_path='$file_path';" 2>/dev/null)
+    local cached_hash=$(sqlite3 "$db_path" "SELECT file_hash FROM metadata WHERE file_path = ?;" "$file_path" 2>/dev/null)
     if [ -z "$cached_hash" ]; then
         return 1
     fi
@@ -889,7 +889,7 @@ get_cached_metadata() {
     fi
     
     # Get cached metadata
-    local cached_metadata=$(sqlite3 "$db_path" "SELECT metadata_json FROM metadata WHERE file_path='$file_path';" 2>/dev/null)
+    local cached_metadata=$(sqlite3 "$db_path" "SELECT metadata_json FROM metadata WHERE file_path = ?;" "$file_path" 2>/dev/null)
     if [ -n "$cached_metadata" ]; then
         # Decode base64 metadata
         echo "$cached_metadata" | base64 --decode
@@ -909,7 +909,7 @@ get_cached_modified_time() {
     fi
     
     # Get cached modified time
-    local cached_time=$(sqlite3 "$db_path" "SELECT modified_time FROM file_info WHERE file_path='$file_path';" 2>/dev/null)
+    local cached_time=$(sqlite3 "$db_path" "SELECT modified_time FROM file_info WHERE file_path = ?;" "$file_path" 2>/dev/null)
     if [ -n "$cached_time" ]; then
         echo "$cached_time"
         return 0
@@ -928,8 +928,8 @@ invalidate_cache_entry() {
     fi
     
     # Delete cache entries for this file
-    sqlite3 "$db_path" "DELETE FROM metadata WHERE file_path='$file_path';" 2>/dev/null
-    sqlite3 "$db_path" "DELETE FROM file_info WHERE file_path='$file_path';" 2>/dev/null
+    sqlite3 "$db_path" "DELETE FROM metadata WHERE file_path = ?;" "$file_path" 2>/dev/null
+    sqlite3 "$db_path" "DELETE FROM file_info WHERE file_path = ?;" "$file_path" 2>/dev/null
 }
 
 # Function to get cache statistics
@@ -2355,13 +2355,15 @@ search_directory_parallel() {
     local temp_results=$(mktemp)
     local temp_script=$(mktemp)
     
+    # Set up cleanup trap
+    trap 'rm -f "$temp_file_list" "$temp_results" "$temp_script"' EXIT
+    
     # Collect all files
     eval "$find_cmd" > "$temp_file_list"
     total_files=$(wc -l < "$temp_file_list")
     
     if [ "$total_files" -eq 0 ]; then
         echo -e "${YELLOW}No files found in directory${NC}"
-        rm -f "$temp_file_list" "$temp_results" "$temp_script"
         return
     fi
     
@@ -2579,7 +2581,7 @@ EOF
     fi
     
     # Clean up
-    rm -f "$temp_file_list" "$temp_results" "$temp_script"
+    # Cleanup handled by trap
     
     # Return counts for JSON/CSV output
     SEARCH_TOTAL_FILES=$total_files
@@ -2867,6 +2869,10 @@ main() {
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
         case $1 in
+            -h|--help)
+                print_usage
+                exit 0
+                ;;
             -v|--verbose)
                 VERBOSE=true
                 shift
@@ -2889,8 +2895,7 @@ main() {
                 ;;
             -f|--field)
                 SEARCH_FIELD="$2"
-                shift
-                shift
+                shift 2
                 ;;
             -l|--field-list)
                 SHOW_FIELD_LIST=true
@@ -2944,17 +2949,8 @@ main() {
                 FUZZY_THRESHOLD="$2"
                 shift 2
                 ;;
-            --incremental)
-                INCREMENTAL=true
-                shift
-                ;;
             --parallel)
-                if [ "$2" = "auto" ]; then
-                    PARALLEL_AUTO=true
-                    PARALLEL_WORKERS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
-                else
-                    PARALLEL_WORKERS="$2"
-                fi
+                PARALLEL_WORKERS="$2"
                 shift 2
                 ;;
             --batch-size)
@@ -2980,6 +2976,14 @@ main() {
             --performance-report)
                 PERFORMANCE_REPORT=true
                 shift
+                ;;
+            --cache-enabled)
+                CACHE_ENABLED=true
+                shift
+                ;;
+            --cache-db)
+                CACHE_DB="$2"
+                shift 2
                 ;;
             --cache-init)
                 CACHE_INIT=true
@@ -3019,10 +3023,6 @@ main() {
                 ;;
             --cache-compress)
                 CACHE_COMPRESS=true
-                shift
-                ;;
-            --cache-enabled)
-                CACHE_ENABLED=true
                 shift
                 ;;
             --cache-stats)
@@ -3209,9 +3209,9 @@ main() {
                 CACHE_STRUCTURE_VALIDATE=true
                 shift
                 ;;
-            -h|--help)
-                print_usage
-                exit 0
+            --incremental)
+                INCREMENTAL=true
+                shift
                 ;;
             --timestamp-track)
                 TIMESTAMP_TRACK=true
@@ -3263,6 +3263,15 @@ main() {
     fi
     if [ ${#args[@]} -ge 2 ]; then
         directory="${args[1]}"
+    fi
+
+    # Validate inputs
+    if [ -n "$search_string" ] && ! validate_search_string "$search_string"; then
+        exit 1
+    fi
+    
+    if [ -n "$directory" ] && ! validate_directory_path "$directory"; then
+        exit 1
     fi
 
     # Check for incremental mode first

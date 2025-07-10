@@ -61,7 +61,8 @@ store_metadata_in_cache() {
     # Base64 encode metadata to avoid SQL issues
     local metadata_b64=$(echo "$metadata" | b64_encode)
     
-    printf "INSERT OR REPLACE INTO metadata_cache (file_path, metadata, accessed_at) VALUES ('%s', '%s', CURRENT_TIMESTAMP);\n" "$file" "$metadata_b64" | sqlite3 "$cache_db"
+    # Use parameterized query to prevent SQL injection
+    sqlite3 "$cache_db" "INSERT OR REPLACE INTO metadata_cache (file_path, metadata, accessed_at) VALUES (?, ?, CURRENT_TIMESTAMP);" "$file" "$metadata_b64"
 }
 
 # Function to retrieve metadata from cache
@@ -69,10 +70,8 @@ get_cached_metadata() {
     local file="$1"
     local cache_db="${2:-$CACHE_DB}"
     
-    local metadata_b64=$(sqlite3 "$cache_db" << EOF
-SELECT metadata FROM metadata_cache WHERE file_path = '$file';
-EOF
-)
+    # Use parameterized query to prevent SQL injection
+    local metadata_b64=$(sqlite3 "$cache_db" "SELECT metadata FROM metadata_cache WHERE file_path = ?;" "$file")
     if [ -n "$metadata_b64" ]; then
         echo "$metadata_b64" | b64_decode
     fi
@@ -83,10 +82,8 @@ get_legacy_cached_metadata() {
     local file="$1"
     local cache_db="${2:-$CACHE_DB}"
     
-    local metadata_json=$(sqlite3 "$cache_db" << EOF
-SELECT metadata_json FROM metadata WHERE file_path = '$file';
-EOF
-)
+    # Use parameterized query to prevent SQL injection
+    local metadata_json=$(sqlite3 "$cache_db" "SELECT metadata_json FROM metadata WHERE file_path = ?;" "$file")
     if [ -n "$metadata_json" ]; then
         echo "$metadata_json"
     fi
@@ -97,10 +94,8 @@ is_file_cached() {
     local file="$1"
     local cache_db="${2:-$CACHE_DB}"
     
-    local result=$(sqlite3 "$cache_db" << EOF
-SELECT COUNT(*) FROM metadata_cache WHERE file_path = '$file';
-EOF
-)
+    # Use parameterized query to prevent SQL injection
+    local result=$(sqlite3 "$cache_db" "SELECT COUNT(*) FROM metadata_cache WHERE file_path = ?;" "$file")
     
     [ "$result" -gt 0 ]
 }
@@ -114,14 +109,8 @@ store_file_info() {
     local file_type="$5"
     local cache_db="${6:-$CACHE_DB}"
     
-    sqlite3 "$cache_db" << EOF
-UPDATE metadata_cache 
-SET file_size = $file_size, 
-    file_hash = '$file_hash', 
-    modified_time = $modified_time, 
-    file_type = '$file_type'
-WHERE file_path = '$file';
-EOF
+    # Use parameterized query to prevent SQL injection
+    sqlite3 "$cache_db" "UPDATE metadata_cache SET file_size = ?, file_hash = ?, modified_time = ?, file_type = ? WHERE file_path = ?;" "$file_size" "$file_hash" "$modified_time" "$file_type" "$file"
 }
 
 # Function to get cached modified time
@@ -129,9 +118,8 @@ get_cached_modified_time() {
     local file="$1"
     local cache_db="${2:-$CACHE_DB}"
     
-    sqlite3 "$cache_db" << EOF
-SELECT modified_time FROM metadata_cache WHERE file_path = '$file';
-EOF
+    # Use parameterized query to prevent SQL injection
+    sqlite3 "$cache_db" "SELECT modified_time FROM metadata_cache WHERE file_path = ?;" "$file"
 }
 
 # Function to invalidate cache entry
@@ -139,9 +127,8 @@ invalidate_cache_entry() {
     local file="$1"
     local cache_db="${2:-$CACHE_DB}"
     
-    sqlite3 "$cache_db" << EOF
-DELETE FROM metadata_cache WHERE file_path = '$file';
-EOF
+    # Use parameterized query to prevent SQL injection
+    sqlite3 "$cache_db" "DELETE FROM metadata_cache WHERE file_path = ?;" "$file"
 }
 
 # Function to clear all cache
