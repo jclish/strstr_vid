@@ -150,6 +150,9 @@ generate_progress_bar() {
     local current="$1"
     local total="$2"
     local width="${3:-50}"
+    local style="${4:-unicode}"  # unicode, ascii, or custom
+    local show_percentage="${5:-true}"
+    local show_counts="${6:-true}"
     
     if [ "$total" -eq 0 ]; then
         return
@@ -159,10 +162,43 @@ generate_progress_bar() {
     local filled=$((percentage * width / 100))
     local empty=$((width - filled))
     
-    printf "\r["
-    printf "%${filled}s" | tr ' ' '#'
-    printf "%${empty}s" | tr ' ' '-'
-    printf "] %d%%" "$percentage"
+    # Choose character style
+    local filled_char="█"
+    local empty_char="░"
+    case "$style" in
+        "ascii")
+            filled_char="#"
+            empty_char="-"
+            ;;
+        "custom")
+            filled_char="${7:-█}"
+            empty_char="${8:-░}"
+            ;;
+        "unicode"|*)
+            filled_char="█"
+            empty_char="░"
+            ;;
+    esac
+    
+    # Build progress bar
+    local progress_bar=""
+    for i in $(seq 1 $filled); do
+        progress_bar="${progress_bar}${filled_char}"
+    done
+    for i in $(seq 1 $empty); do
+        progress_bar="${progress_bar}${empty_char}"
+    done
+    
+    # Format output
+    local output="[${progress_bar}]"
+    if [ "$show_percentage" = "true" ]; then
+        output="${output} ${percentage}%"
+    fi
+    if [ "$show_counts" = "true" ]; then
+        output="${output} (${current}/${total})"
+    fi
+    
+    printf "\r%s" "$output"
     
     if [ "$current" -eq "$total" ]; then
         echo
@@ -172,4 +208,45 @@ generate_progress_bar() {
 # Function to clear progress bar line
 clear_progress_line() {
     printf "\r%${COLUMNS}s\r"
+}
+
+# Function to show progress with stage information
+show_progress_with_stage() {
+    local current="$1"
+    local total="$2"
+    local stage="$3"
+    local eta="${4:-}"
+    local width="${5:-50}"
+    
+    if [ "$total" -eq 0 ]; then
+        return
+    fi
+    
+    local percentage=$((current * 100 / total))
+    local filled=$((percentage * width / 100))
+    local empty=$((width - filled))
+    
+    # Build progress bar
+    local progress_bar=""
+    for i in $(seq 1 $filled); do
+        progress_bar="${progress_bar}█"
+    done
+    for i in $(seq 1 $empty); do
+        progress_bar="${progress_bar}░"
+    done
+    
+    # Format output with stage and ETA
+    local output="[${progress_bar}] ${current}/${total}"
+    if [ -n "$stage" ]; then
+        output="Stage: ${stage} ${output}"
+    fi
+    if [ -n "$eta" ]; then
+        output="${output} (ETA: ${eta})"
+    fi
+    
+    printf "\r\033[K%s" "$output"
+    
+    if [ "$current" -eq "$total" ]; then
+        echo
+    fi
 } 

@@ -79,6 +79,16 @@ else
 fi
 echo ""
 
+# Run incremental foundation tests
+echo -e "${YELLOW}Running test_incremental_foundation.bats...${NC}"
+if bats test_incremental_foundation.bats; then
+    echo -e "${GREEN}✓ test_incremental_foundation.bats passed${NC}"
+else
+    echo -e "${RED}✗ test_incremental_foundation.bats failed${NC}"
+    exit 1
+fi
+echo ""
+
 echo -e "${GREEN}=== Test Summary ===${NC}"
 echo -e "${GREEN}✓ All tests passed!${NC}"
 echo ""
@@ -87,6 +97,7 @@ echo "  • Basic search functionality"
 echo "  • Advanced search features (boolean, fuzzy, GPS)"
 echo "  • Real media file processing"
 echo "  • Report generation and export formats"
+echo "  • Incremental processing and change detection"
 echo "  • Error handling and edge cases"
 echo ""
 echo -e "${GREEN}Test suite completed successfully!${NC}" 

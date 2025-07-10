@@ -88,35 +88,6 @@ check_memory_limit() {
     return 0
 }
 
-# Function to generate progress bar
-generate_progress_bar() {
-    local current="$1"
-    local total="$2"
-    local width="${3:-50}"
-    
-    if [ "$total" -eq 0 ]; then
-        return
-    fi
-    
-    local percentage=$((current * 100 / total))
-    local filled=$((percentage * width / 100))
-    local empty=$((width - filled))
-    
-    printf "\r["
-    printf "%${filled}s" | tr ' ' '#'
-    printf "%${empty}s" | tr ' ' '-'
-    printf "] %d%%" "$percentage"
-    
-    if [ "$current" -eq "$total" ]; then
-        echo
-    fi
-}
-
-# Function to clear progress bar line
-clear_progress_line() {
-    printf "\r%${COLUMNS}s\r"
-}
-
 # Function to calculate ETA
 calculate_eta() {
     local elapsed="$1"
@@ -206,9 +177,9 @@ EOF
             # Process batch with specified number of workers
             cat "$batch_file" | xargs -P "$workers" -I {} bash "$temp_script" {} >> "$temp_results" 2>/dev/null &
             
-            # Update progress
+            # Update progress using the enhanced progress bar function
             processed=$((processed + $(wc -l < "$batch_file")))
-            generate_progress_bar "$processed" "$total_files"
+            generate_progress_bar "$processed" "$total_files" 50 "unicode" "true" "true"
         fi
     done
     

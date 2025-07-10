@@ -1420,18 +1420,18 @@ generate_keyword_heatmap() {
         fi
         
         # Create visual heatmap bar
+        local bar_width=$((count * max_width / max_value))
+        # Ensure at least 1 character for non-zero values
+        if [ "$count" -gt 0 ] && [ "$bar_width" -eq 0 ]; then
+            bar_width=1
+        fi
+        
+        # Use the shared progress bar function for consistent styling
         local bar=""
-        for i in $(seq 1 $intensity); do
+        for i in $(seq 1 $bar_width); do
             bar="${bar}█"
         done
-        
-        # Pad with spaces for alignment
-        local padding=""
-        for i in $(seq $intensity 10); do
-            padding="${padding} "
-        done
-        
-        printf "  %-15s: %s%s (%d)\n" "$keyword" "$bar" "$padding" "$count"
+        printf "  %-20s [%-${max_width}s] %d\n" "$keyword" "$bar" "$count"
     done
     
     # Show frequency ranges
@@ -1609,7 +1609,10 @@ main() {
     
     # Check dependencies
     check_dependencies
-    
+
+    # Disable 'set -e' before main processing to avoid exit on non-critical errors
+    set +e  # Allow nonzero exit codes in file processing; we want to process as many files as possible
+
     # Set find command based on recursive flag
     local find_cmd="find \"$directory\""
     if [ "$recursive" = false ]; then
@@ -1669,7 +1672,7 @@ main() {
         
         # Show initial progress
         echo -e "${CYAN}🔍 Stage: $stage${NC}"
-        printf "\r\033[KProgress: [%-50s] %d/%d files" "$(printf '#%.0s' $(seq 1 0))" "$processed" "$total_files"
+        generate_progress_bar "$processed" "$total_files" 50 "unicode" "true" "true"
         
         while read -r file; do
             ((processed++))
@@ -1703,18 +1706,8 @@ main() {
                     stage="FINALIZING"
                 fi
                 
-                # Color-coded progress bar
-                local progress_bar=""
-                for i in $(seq 1 50); do
-                    if [ $i -le $progress ]; then
-                        progress_bar="${progress_bar}█"
-                    else
-                        progress_bar="${progress_bar}░"
-                    fi
-                done
-                
-                # Clear the line and print progress bar
-                printf "\r\033[K${CYAN}🔍 Stage: %-12s${NC} [%s] %d/%d files%s" "$stage" "$progress_bar" "$processed" "$total_files" "$eta"
+                # Use the enhanced progress bar with stage information
+                show_progress_with_stage "$processed" "$total_files" "$stage" "$eta" 50
             fi
             
             # Get file size
